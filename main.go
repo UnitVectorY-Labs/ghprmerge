@@ -1,5 +1,6 @@
-// Package main provides the ghprmerge command-line application.
 package main
+
+var Version = "dev" // Set by the build system to the release version
 
 import (
 	"context"
@@ -52,4 +53,4 @@ func run() error {
 	// Output results
 	writer := output.NewWriter(os.Stdout, cfg.JSON)
 	return writer.WriteResult(result)
-}
+

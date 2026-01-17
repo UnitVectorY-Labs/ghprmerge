@@ -1,6 +1,6 @@
 module github.com/UnitVectorY-Labs/ghprmerge
 
-go 1.24.0
+go 1.25.6 // GOVERSION
 
 toolchain go1.24.11
 
@@ -10,3 +10,4 @@ require (
 )
 
 require github.com/google/go-querystring v1.1.0 // indirect
+
