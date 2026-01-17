@@ -12,12 +12,11 @@ ghprmerge [flags]
 |------|---------|---------------|-------------|
 | `--org` | `GITHUB_ORG` env | No | GitHub organization to scan (required) |
 | `--source-branch` | - | No | Branch pattern to match PR head branches (required) |
-| `--rebase` | `false` | **Yes** | Update out-of-date branches |
-| `--merge` | `false` | **Yes** | Merge PRs that are in a valid state |
+| `--rebase` | `false` | **Yes** | Update out-of-date branches (mutually exclusive with --merge) |
+| `--merge` | `false` | **Yes** | Merge PRs that are in a valid state (mutually exclusive with --rebase) |
 | `--repo` | - | No | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
-| `--verbose` | `false` | No | Enable verbose logging output |
 | `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
 | `--version` | - | No | Show version information and exit |
 
@@ -50,8 +49,8 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase
 - Updates out-of-date branches
 - For Dependabot branches: posts `@dependabot rebase` comment
 - For other branches: uses GitHub's update branch API
-- **Does NOT merge** (use `--merge` to also merge)
-- Reports which PRs are merge-ready after update
+- **Does NOT merge** - rebase and merge are mutually exclusive
+- After rebasing, run a separate `--merge` command once checks pass
 
 ### Merge Only
 
@@ -59,20 +58,9 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase
 ghprmerge --org myorg --source-branch dependabot/ --merge
 ```
 
-- Merges PRs that are already in a valid state
-- **Does NOT attempt any rebases**
+- Merges PRs that are already in a valid state (up-to-date, checks passing)
+- **Does NOT attempt any rebases** - rebase and merge are mutually exclusive
 - Skips PRs that are behind with a clear reason
-
-### Rebase and Merge
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
-```
-
-- Updates branches where needed
-- Merges PRs that are valid after evaluation
-- If checks become pending after rebase, PR is reported as "updated, awaiting checks" and skipped for merging
-- **Note**: Rebased PRs need time for checks to re-run before they can be merged
 
 ### Confirmation Mode
 
@@ -92,18 +80,6 @@ ghprmerge --version
 ```
 
 Displays the version of ghprmerge.
-
-## Verbose Mode
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/ --verbose
-```
-
-Enables detailed logging output showing:
-- Check status evaluations for each PR
-- Branch status details
-- Dependabot vs non-Dependabot branch detection
-- Individual action decisions
 
 ## Repo Limit Semantics
 

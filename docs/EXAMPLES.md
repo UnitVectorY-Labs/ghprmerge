@@ -16,14 +16,6 @@ ghprmerge --org myorg --source-branch dependabot/
 
 This scans all repositories, evaluates PRs, and reports what would be rebased and merged.
 
-## Verbose Analysis Run
-
-Get detailed logging about each PR evaluation:
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/ --verbose
-```
-
 ## Rebase Only Run
 
 Update out-of-date branches without merging:
@@ -34,6 +26,8 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase
 
 For Dependabot branches, this posts a `@dependabot rebase` comment. For other branches, it uses GitHub's update branch API.
 
+**Note**: `--rebase` and `--merge` are mutually exclusive. After rebasing, wait for checks to pass then run with `--merge`.
+
 ## Merge Only Run
 
 Merge PRs that are already in a valid state (up-to-date, checks passing):
@@ -42,17 +36,7 @@ Merge PRs that are already in a valid state (up-to-date, checks passing):
 ghprmerge --org myorg --source-branch dependabot/ --merge
 ```
 
-PRs that are behind the default branch will be skipped (use `--rebase` to update them first).
-
-## Rebase Then Merge Run
-
-Update branches and merge in one run:
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
-```
-
-Note: If checks become pending after a rebase, the PR is reported as "updated, awaiting checks" and skipped for merging in that run. You may need to run the command again after checks complete.
+PRs that are behind the default branch will be skipped (use `--rebase` first to update them).
 
 ## Confirmation Mode
 

@@ -31,7 +31,6 @@ type Config struct {
 	Repos        []string
 	RepoLimit    int
 	JSON         bool
-	Verbose      bool
 	Confirm      bool
 	Token        string
 }
@@ -52,6 +51,10 @@ func (c *Config) Validate() error {
 	if c.Token == "" {
 		return fmt.Errorf("no GitHub token found: set GITHUB_TOKEN environment variable or authenticate with 'gh auth login'")
 	}
+	// --rebase and --merge are mutually exclusive
+	if c.Rebase && c.Merge {
+		return fmt.Errorf("--rebase and --merge are mutually exclusive; use one or the other")
+	}
 	return nil
 }
 
@@ -69,11 +72,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	org := fs.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
 	sourceBranch := fs.String("source-branch", "", "Branch name pattern to match pull request head branches")
-	rebase := fs.Bool("rebase", false, "Update out-of-date branches (does not merge unless --merge is also set)")
-	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state")
+	rebase := fs.Bool("rebase", false, "Update out-of-date branches (mutually exclusive with --merge)")
+	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state (mutually exclusive with --rebase)")
 	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
-	verbose := fs.Bool("verbose", false, "Enable verbose logging output")
 	confirm := fs.Bool("confirm", false, "Scan all repos first, then prompt for confirmation before taking actions")
 	showVersion := fs.Bool("version", false, "Show version information and exit")
 
@@ -100,7 +102,6 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		Repos:        repos,
 		RepoLimit:    *repoLimit,
 		JSON:         *jsonOutput,
-		Verbose:      *verbose,
 		Confirm:      *confirm,
 		Token:        token,
 	}, nil

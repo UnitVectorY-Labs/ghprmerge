@@ -29,13 +29,13 @@ func TestParseFlags(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:          "all flags provided",
-			args:          []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase", "--merge", "--repo-limit", "10", "--json"},
+			name:          "rebase with json and limit",
+			args:          []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase", "--repo-limit", "10", "--json"},
 			envToken:      "test-token",
 			wantOrg:       "myorg",
 			wantBranch:    "dependabot/",
 			wantRebase:    true,
-			wantMerge:     true,
+			wantMerge:     false,
 			wantRepoLimit: 10,
 			wantJSON:      true,
 		},
@@ -143,6 +143,26 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid config with rebase",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				Rebase:       true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with merge",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				Merge:        true,
+			},
+			wantErr: false,
+		},
+		{
 			name: "missing org",
 			config: Config{
 				SourceBranch: "dependabot/",
@@ -168,6 +188,18 @@ func TestConfigValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "no GitHub token found",
+		},
+		{
+			name: "rebase and merge mutually exclusive",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				Rebase:       true,
+				Merge:        true,
+			},
+			wantErr: true,
+			errMsg:  "mutually exclusive",
 		},
 	}
 
@@ -207,11 +239,7 @@ func TestIsAnalysisOnly(t *testing.T) {
 			config: Config{Merge: true},
 			want:   false,
 		},
-		{
-			name:   "both rebase and merge is not analysis only",
-			config: Config{Rebase: true, Merge: true},
-			want:   false,
-		},
+		// Note: --rebase and --merge together is invalid and rejected by Validate()
 	}
 
 	for _, tt := range tests {
