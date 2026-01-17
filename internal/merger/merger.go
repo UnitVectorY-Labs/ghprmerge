@@ -360,7 +360,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		result.Action = output.ActionWouldMerge
 		result.Reason = "all checks passing, branch up to date"
 	} else {
-		result.Action = output.ActionWouldMerge
+		result.Action = output.ActionReadyMerge
 		result.Reason = "all checks passing, branch up to date (use --merge to merge)"
 	}
 
@@ -399,6 +399,8 @@ func (m *Merger) updateSummary(summary *output.RunSummary, pr output.PullRequest
 		summary.WouldMerge++
 	case output.ActionWouldRebase:
 		summary.WouldRebase++
+	case output.ActionReadyMerge:
+		summary.ReadyToMerge++
 	default:
 		if strings.HasPrefix(string(pr.Action), "skip:") {
 			summary.Skipped++
@@ -572,12 +574,11 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 		return result
 	}
 
-	m.logVerbose("  Branch status: %s", func() string {
-		if branchStatus.UpToDate {
-			return "up to date"
-		}
-		return fmt.Sprintf("behind by %d commits", branchStatus.BehindBy)
-	}())
+	branchStatusMsg := "up to date"
+	if !branchStatus.UpToDate {
+		branchStatusMsg = fmt.Sprintf("behind by %d commits", branchStatus.BehindBy)
+	}
+	m.logVerbose("  Branch status: %s", branchStatusMsg)
 
 	// Check if branch is up to date
 	if !branchStatus.UpToDate {
@@ -655,8 +656,8 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 
 	// If merge is not enabled, just report
 	if !m.config.Merge {
-		result.Action = output.ActionWouldMerge
-		result.Reason = "all checks passing, branch up to date"
+		result.Action = output.ActionReadyMerge
+		result.Reason = "all checks passing, branch up to date (use --merge to merge)"
 		m.logVerbose("  PR #%d: ready to merge (use --merge to merge)", pr.Number)
 		return result
 	}

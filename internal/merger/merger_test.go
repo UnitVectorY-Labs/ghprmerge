@@ -56,20 +56,20 @@ func TestMergerAnalysisOnly(t *testing.T) {
 		t.Errorf("Expected no merge calls in analysis mode, got %d", len(mock.MergeCalls))
 	}
 
-	// Verify result
-	if result.Summary.WouldMerge != 1 {
-		t.Errorf("WouldMerge = %d, want 1", result.Summary.WouldMerge)
+	// Verify result - should be ReadyToMerge since merge is not enabled
+	if result.Summary.ReadyToMerge != 1 {
+		t.Errorf("ReadyToMerge = %d, want 1", result.Summary.ReadyToMerge)
 	}
 
-	// Verify action is "would merge"
+	// Verify action is "ready to merge" (not "would merge" since merge is disabled)
 	if len(result.Repositories) != 1 {
 		t.Fatalf("Expected 1 repository, got %d", len(result.Repositories))
 	}
 	if len(result.Repositories[0].PullRequests) != 1 {
 		t.Fatalf("Expected 1 PR, got %d", len(result.Repositories[0].PullRequests))
 	}
-	if result.Repositories[0].PullRequests[0].Action != output.ActionWouldMerge {
-		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionWouldMerge)
+	if result.Repositories[0].PullRequests[0].Action != output.ActionReadyMerge {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionReadyMerge)
 	}
 
 	// Verify mode description

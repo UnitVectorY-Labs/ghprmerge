@@ -16,6 +16,7 @@ const (
 	// Analysis mode actions (what would happen)
 	ActionWouldMerge  Action = "would merge"
 	ActionWouldRebase Action = "would rebase"
+	ActionReadyMerge  Action = "ready to merge" // Ready but merge not enabled
 
 	// Execution mode actions (what happened)
 	ActionMerged       Action = "merged"
@@ -108,6 +109,7 @@ type RunSummary struct {
 	RebaseFailed      int            `json:"rebase_failed"`
 	WouldMerge        int            `json:"would_merge,omitempty"`
 	WouldRebase       int            `json:"would_rebase,omitempty"`
+	ReadyToMerge      int            `json:"ready_to_merge,omitempty"`
 	Skipped           int            `json:"skipped"`
 	SkippedByReason   map[string]int `json:"skipped_by_reason,omitempty"`
 }
@@ -196,6 +198,11 @@ func (w *Writer) writeHuman(result *RunResult) error {
 		fmt.Fprintf(w.out, "  Would rebase:            %d\n", result.Summary.WouldRebase)
 	}
 
+	// Show ready to merge (when merge not enabled)
+	if result.Summary.ReadyToMerge > 0 {
+		fmt.Fprintf(w.out, "  Ready to merge:          %d\n", result.Summary.ReadyToMerge)
+	}
+
 	// Show execution mode results
 	if result.Summary.MergedSuccess > 0 || result.Summary.MergeFailed > 0 {
 		fmt.Fprintf(w.out, "  Merged successfully:     %d\n", result.Summary.MergedSuccess)
@@ -224,7 +231,7 @@ func (w *Writer) writeHuman(result *RunResult) error {
 // getActionSymbol returns a symbol for the action type.
 func (w *Writer) getActionSymbol(action Action) string {
 	switch action {
-	case ActionMerged, ActionWouldMerge:
+	case ActionMerged, ActionWouldMerge, ActionReadyMerge:
 		return "✓"
 	case ActionRebased, ActionWouldRebase:
 		return "↻"
