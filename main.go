@@ -54,3 +54,4 @@ func run() error {
 	writer := output.NewWriter(os.Stdout, cfg.JSON)
 	return writer.WriteResult(result)
 
+}
