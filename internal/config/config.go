@@ -53,7 +53,7 @@ func (c *Config) Validate() error {
 	}
 	// --rebase and --merge are mutually exclusive
 	if c.Rebase && c.Merge {
-		return fmt.Errorf("--rebase and --merge are mutually exclusive; use one or the other")
+		return fmt.Errorf("--rebase and --merge are mutually exclusive; use --rebase first to update branches, then --merge after checks pass")
 	}
 	return nil
 }

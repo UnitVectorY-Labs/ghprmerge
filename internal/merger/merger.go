@@ -165,6 +165,9 @@ func (m *Merger) getActionSymbol(action output.Action) string {
 
 // truncateString truncates a string to maxLen and adds "..." if needed.
 func truncateString(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
 	if len(s) <= maxLen {
 		return s
 	}
@@ -376,16 +379,13 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 
 // getModeDescription returns a human-readable description of the current mode.
 func (m *Merger) getModeDescription() string {
-	if m.config.IsAnalysisOnly() {
-		return "analysis only (no mutations)"
-	}
 	if m.config.Rebase {
 		return "rebase mode"
 	}
 	if m.config.Merge {
 		return "merge mode"
 	}
-	return "analysis only"
+	return "analysis only (no mutations)"
 }
 
 // updateSummary updates the run summary based on a PR result.
