@@ -1,7 +1,5 @@
 package main
 
-var Version = "dev" // Set by the build system to the release version
-
 import (
 	"context"
 	"errors"
@@ -13,6 +11,8 @@ import (
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/merger"
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/output"
 )
+
+var Version = "dev" // Set by the build system to the release version
 
 func main() {
 	if err := run(); err != nil {
