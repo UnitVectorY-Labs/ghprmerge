@@ -1,6 +1,8 @@
 module github.com/UnitVectorY-Labs/ghprmerge
 
-go 1.24.11
+go 1.24.0
+
+toolchain go1.24.11
 
 require (
 	github.com/google/go-github/v60 v60.0.0
