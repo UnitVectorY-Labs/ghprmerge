@@ -1,5 +1,11 @@
 # Examples
 
+## Show Version
+
+```bash
+ghprmerge --version
+```
+
 ## Default Analysis Run
 
 Preview what would happen without making any changes:
@@ -9,6 +15,14 @@ ghprmerge --org myorg --source-branch dependabot/
 ```
 
 This scans all repositories, evaluates PRs, and reports what would be rebased and merged.
+
+## Verbose Analysis Run
+
+Get detailed logging about each PR evaluation:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --verbose
+```
 
 ## Rebase Only Run
 
@@ -38,7 +52,17 @@ Update branches and merge in one run:
 ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
 ```
 
-Note: If checks become pending after a rebase, the PR is reported as "updated, awaiting checks" and skipped for merging in that run.
+Note: If checks become pending after a rebase, the PR is reported as "updated, awaiting checks" and skipped for merging in that run. You may need to run the command again after checks complete.
+
+## Confirmation Mode
+
+Scan all repositories first, then prompt before taking actions:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
+```
+
+This is useful when you want to review the planned actions before execution.
 
 ## Scoped Repository Run
 
@@ -103,8 +127,8 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 # Step 1: Analyze what's available
 ghprmerge --org myorg --source-branch dependabot/
 
-# Step 2: Rebase out-of-date branches
-ghprmerge --org myorg --source-branch dependabot/ --rebase
+# Step 2: Rebase out-of-date branches with confirmation
+ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 
 # Step 3: Wait for checks to complete (manual or scripted)
 sleep 300
@@ -132,6 +156,9 @@ jobs:
         run: |
           curl -L https://github.com/UnitVectorY-Labs/ghprmerge/releases/latest/download/ghprmerge_linux_amd64 -o ghprmerge
           chmod +x ghprmerge
+
+      - name: Check version
+        run: ./ghprmerge --version
 
       - name: Analyze
         env:

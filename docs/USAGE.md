@@ -17,6 +17,9 @@ ghprmerge [flags]
 | `--repo` | - | No | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
+| `--verbose` | `false` | No | Enable verbose logging output |
+| `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
+| `--version` | - | No | Show version information and exit |
 
 ## Environment Variables
 
@@ -69,6 +72,38 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
 - Updates branches where needed
 - Merges PRs that are valid after evaluation
 - If checks become pending after rebase, PR is reported as "updated, awaiting checks" and skipped for merging
+- **Note**: Rebased PRs need time for checks to re-run before they can be merged
+
+### Confirmation Mode
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
+```
+
+- Scans all repositories first
+- Displays summary of planned actions
+- Prompts for user confirmation before executing
+- Useful for reviewing changes before taking action
+
+## Version Information
+
+```bash
+ghprmerge --version
+```
+
+Displays the version of ghprmerge.
+
+## Verbose Mode
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --verbose
+```
+
+Enables detailed logging output showing:
+- Check status evaluations for each PR
+- Branch status details
+- Dependabot vs non-Dependabot branch detection
+- Individual action decisions
 
 ## Repo Limit Semantics
 
@@ -103,6 +138,7 @@ Repositories are processed **one at a time**. The tool:
 
 - Never loads all org data before performing mutations
 - Never operates on multiple repos in parallel
+- Logs progress for each repository as it's processed
 - Prints results for each repo immediately after processing
 
 ## Skip Reasons
@@ -134,6 +170,20 @@ Clear sections per repository with consistent status symbols:
 - `✗` failed
 - `⊘` skipped
 
+Progress is logged to stderr as repositories are scanned:
+```
+Starting ghprmerge for organization: myorg
+Source branch pattern: dependabot/
+Mode: analysis only (no mutations)
+Discovering repositories...
+Found 5 repositories to process
+[1/5] Scanning repository: myorg/repo1
+  └─ Found 2 matching pull request(s)
+[2/5] Scanning repository: myorg/repo2
+  └─ No matching pull requests
+...
+```
+
 ### JSON Mode
 
 ```bash
@@ -145,3 +195,12 @@ Outputs structured JSON with:
 - Per-repository results
 - Per-PR decisions with action and reason
 - Summary statistics grouped by skip reason
+
+## Dependabot Branch Handling
+
+For branches with the `dependabot/` prefix:
+- **Rebase method**: Posts `@dependabot rebase` comment instead of directly updating the branch
+- Dependabot will then perform the rebase on its own
+
+For non-Dependabot branches:
+- **Rebase method**: Uses GitHub's update branch API directly

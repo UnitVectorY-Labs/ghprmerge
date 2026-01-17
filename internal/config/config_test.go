@@ -91,7 +91,7 @@ func TestParseFlags(t *testing.T) {
 			os.Setenv("GITHUB_TOKEN", tt.envToken)
 			os.Setenv("GITHUB_ORG", tt.envOrg)
 
-			cfg, err := ParseFlags(tt.args)
+			cfg, err := ParseFlags(tt.args, "test")
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}

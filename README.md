@@ -10,6 +10,9 @@ Primary use case: merging automated dependency update pull requests (e.g., Depen
 # Set your GitHub token
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 
+# Check version
+ghprmerge --version
+
 # Analyze what would be merged (default mode)
 ghprmerge --org myorg --source-branch dependabot/
 
@@ -21,6 +24,9 @@ ghprmerge --org myorg --source-branch dependabot/ --merge
 
 # Rebase and merge in one run
 ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
+
+# Use --confirm to review before taking actions
+ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ```
 
 ## Documentation

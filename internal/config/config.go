@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -30,6 +31,8 @@ type Config struct {
 	Repos        []string
 	RepoLimit    int
 	JSON         bool
+	Verbose      bool
+	Confirm      bool
 	Token        string
 }
 
@@ -55,8 +58,11 @@ func (c *Config) Validate() error {
 // ErrHelp is returned when -help or -h is passed.
 var ErrHelp = flag.ErrHelp
 
+// ErrVersion is returned when --version is passed.
+var ErrVersion = errors.New("version requested")
+
 // ParseFlags parses command-line flags and environment variables.
-func ParseFlags(args []string) (*Config, error) {
+func ParseFlags(args []string, version string) (*Config, error) {
 	fs := flag.NewFlagSet("ghprmerge", flag.ContinueOnError)
 
 	var repos StringSliceFlag
@@ -67,11 +73,20 @@ func ParseFlags(args []string) (*Config, error) {
 	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state")
 	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
+	verbose := fs.Bool("verbose", false, "Enable verbose logging output")
+	confirm := fs.Bool("confirm", false, "Scan all repos first, then prompt for confirmation before taking actions")
+	showVersion := fs.Bool("version", false, "Show version information and exit")
 
 	fs.Var(&repos, "repo", "Limit execution to specific repositories (may be repeated)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
+	}
+
+	// Handle --version flag
+	if *showVersion {
+		fmt.Printf("ghprmerge version %s\n", version)
+		return nil, ErrVersion
 	}
 
 	// Resolve authentication token
@@ -85,6 +100,8 @@ func ParseFlags(args []string) (*Config, error) {
 		Repos:        repos,
 		RepoLimit:    *repoLimit,
 		JSON:         *jsonOutput,
+		Verbose:      *verbose,
+		Confirm:      *confirm,
 		Token:        token,
 	}, nil
 }

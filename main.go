@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/github"
@@ -12,12 +14,17 @@ import (
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/output"
 )
 
-var Version = "dev" // Set by the build system to the release version
+// Version is set by the build system to the release version
+var Version = "dev"
 
 func main() {
 	if err := run(); err != nil {
 		// Don't print error for help request
 		if errors.Is(err, config.ErrHelp) {
+			os.Exit(0)
+		}
+		// Don't print error for version request
+		if errors.Is(err, config.ErrVersion) {
 			os.Exit(0)
 		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -27,7 +34,7 @@ func main() {
 
 func run() error {
 	// Parse configuration
-	cfg, err := config.ParseFlags(os.Args[1:])
+	cfg, err := config.ParseFlags(os.Args[1:], Version)
 	if err != nil {
 		return err
 	}
@@ -40,8 +47,8 @@ func run() error {
 	// Create GitHub client
 	client := github.NewRealClient(cfg.Token)
 
-	// Create merger
-	m := merger.New(client, cfg)
+	// Create merger with progress logging
+	m := merger.New(client, cfg, os.Stderr)
 
 	// Run merger
 	ctx := context.Background()
@@ -50,8 +57,52 @@ func run() error {
 		return err
 	}
 
+	// If confirm mode is enabled and there are actions to take, prompt user
+	if cfg.Confirm && hasActionsToPerform(result) {
+		if !promptConfirmation(result) {
+			fmt.Fprintln(os.Stderr, "Operation cancelled by user.")
+			return nil
+		}
+		// Re-run with actions enabled
+		result, err = m.RunWithActions(ctx, result)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Output results
 	writer := output.NewWriter(os.Stdout, cfg.JSON)
 	return writer.WriteResult(result)
+}
 
+// hasActionsToPerform checks if the result contains actions that would be performed.
+func hasActionsToPerform(result *output.RunResult) bool {
+	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
+}
+
+// promptConfirmation displays a summary of planned actions and prompts for confirmation.
+func promptConfirmation(result *output.RunResult) bool {
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════════════")
+	fmt.Fprintln(os.Stderr, "                           CONFIRMATION REQUIRED")
+	fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════════════")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintf(os.Stderr, "  Actions to be performed:\n")
+	if result.Summary.WouldMerge > 0 {
+		fmt.Fprintf(os.Stderr, "    • Merge %d pull request(s)\n", result.Summary.WouldMerge)
+	}
+	if result.Summary.WouldRebase > 0 {
+		fmt.Fprintf(os.Stderr, "    • Rebase/update %d pull request(s)\n", result.Summary.WouldRebase)
+	}
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprint(os.Stderr, "  Do you want to proceed? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	input = strings.TrimSpace(strings.ToLower(input))
+	return input == "y" || input == "yes"
 }

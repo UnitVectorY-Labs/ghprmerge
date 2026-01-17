@@ -45,7 +45,7 @@ func TestMergerAnalysisOnly(t *testing.T) {
 		Merge:        false, // Analysis only mode
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -113,7 +113,7 @@ func TestMergerMergeOnly(t *testing.T) {
 		Merge:        true, // Merge mode
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -168,7 +168,7 @@ func TestMergerSkipsFailingChecks(t *testing.T) {
 		Merge:        true,
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -231,7 +231,7 @@ func TestMergerSkipsOutdatedBranch(t *testing.T) {
 		Merge:        true,
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -292,7 +292,7 @@ func TestMergerSkipsConflicts(t *testing.T) {
 		Merge:        true,
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -346,7 +346,7 @@ func TestMergerSkipsArchivedRepos(t *testing.T) {
 		SourceBranch: "dependabot/",
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -408,7 +408,7 @@ func TestMergerSkipsDrafts(t *testing.T) {
 		SourceBranch: "dependabot/",
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -452,7 +452,7 @@ func TestMergerRepoFilter(t *testing.T) {
 		Repos:        []string{"repo1", "repo3"}, // Only these repos
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -508,7 +508,7 @@ func TestMergerRepoLimit(t *testing.T) {
 		RepoLimit:    2, // Only process 2 repos
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -564,7 +564,7 @@ func TestMergerSourceBranchFiltering(t *testing.T) {
 		SourceBranch: "dependabot/",
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -621,7 +621,7 @@ func TestMergerRebaseOnly(t *testing.T) {
 		Merge:        false, // Rebase only, no merge
 	}
 
-	m := New(mock, cfg)
+	m := New(mock, cfg, nil)
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
