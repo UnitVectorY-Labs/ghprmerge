@@ -15,40 +15,40 @@ func TestParseFlags(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name       string
-		args       []string
-		envToken   string
-		envOrg     string
-		wantOrg    string
-		wantBranch string
-		wantDryRun bool
-		wantRebase bool
-		wantLimit  int
-		wantJSON   bool
-		wantRepos  []string
-		wantErr    bool
+		name          string
+		args          []string
+		envToken      string
+		envOrg        string
+		wantOrg       string
+		wantBranch    string
+		wantRebase    bool
+		wantMerge     bool
+		wantRepoLimit int
+		wantJSON      bool
+		wantRepos     []string
+		wantErr       bool
 	}{
 		{
-			name:       "all flags provided",
-			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--dry-run=false", "--rebase", "--limit", "10", "--json"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "dependabot/",
-			wantDryRun: false,
-			wantRebase: true,
-			wantLimit:  10,
-			wantJSON:   true,
+			name:          "all flags provided",
+			args:          []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase", "--merge", "--repo-limit", "10", "--json"},
+			envToken:      "test-token",
+			wantOrg:       "myorg",
+			wantBranch:    "dependabot/",
+			wantRebase:    true,
+			wantMerge:     true,
+			wantRepoLimit: 10,
+			wantJSON:      true,
 		},
 		{
-			name:       "defaults applied",
-			args:       []string{"--org", "myorg", "--source-branch", "dependabot/"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "dependabot/",
-			wantDryRun: true, // default
-			wantRebase: false,
-			wantLimit:  0,
-			wantJSON:   false,
+			name:          "defaults applied",
+			args:          []string{"--org", "myorg", "--source-branch", "dependabot/"},
+			envToken:      "test-token",
+			wantOrg:       "myorg",
+			wantBranch:    "dependabot/",
+			wantRebase:    false,
+			wantMerge:     false,
+			wantRepoLimit: 0,
+			wantJSON:      false,
 		},
 		{
 			name:       "org from env",
@@ -57,7 +57,6 @@ func TestParseFlags(t *testing.T) {
 			envOrg:     "envorg",
 			wantOrg:    "envorg",
 			wantBranch: "dependabot/",
-			wantDryRun: true,
 		},
 		{
 			name:       "multiple repos",
@@ -66,7 +65,24 @@ func TestParseFlags(t *testing.T) {
 			wantOrg:    "myorg",
 			wantBranch: "test",
 			wantRepos:  []string{"repo1", "repo2"},
-			wantDryRun: true,
+		},
+		{
+			name:       "rebase only",
+			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase"},
+			envToken:   "test-token",
+			wantOrg:    "myorg",
+			wantBranch: "dependabot/",
+			wantRebase: true,
+			wantMerge:  false,
+		},
+		{
+			name:       "merge only",
+			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--merge"},
+			envToken:   "test-token",
+			wantOrg:    "myorg",
+			wantBranch: "dependabot/",
+			wantRebase: false,
+			wantMerge:  true,
 		},
 	}
 
@@ -89,14 +105,14 @@ func TestParseFlags(t *testing.T) {
 			if cfg.SourceBranch != tt.wantBranch {
 				t.Errorf("SourceBranch = %v, want %v", cfg.SourceBranch, tt.wantBranch)
 			}
-			if cfg.DryRun != tt.wantDryRun {
-				t.Errorf("DryRun = %v, want %v", cfg.DryRun, tt.wantDryRun)
-			}
 			if cfg.Rebase != tt.wantRebase {
 				t.Errorf("Rebase = %v, want %v", cfg.Rebase, tt.wantRebase)
 			}
-			if cfg.Limit != tt.wantLimit {
-				t.Errorf("Limit = %v, want %v", cfg.Limit, tt.wantLimit)
+			if cfg.Merge != tt.wantMerge {
+				t.Errorf("Merge = %v, want %v", cfg.Merge, tt.wantMerge)
+			}
+			if cfg.RepoLimit != tt.wantRepoLimit {
+				t.Errorf("RepoLimit = %v, want %v", cfg.RepoLimit, tt.wantRepoLimit)
 			}
 			if cfg.JSON != tt.wantJSON {
 				t.Errorf("JSON = %v, want %v", cfg.JSON, tt.wantJSON)
@@ -165,6 +181,43 @@ func TestConfigValidate(t *testing.T) {
 				if !contains(err.Error(), tt.errMsg) {
 					t.Errorf("Validate() error = %v, want to contain %v", err, tt.errMsg)
 				}
+			}
+		})
+	}
+}
+
+func TestIsAnalysisOnly(t *testing.T) {
+	tests := []struct {
+		name   string
+		config Config
+		want   bool
+	}{
+		{
+			name:   "default is analysis only",
+			config: Config{},
+			want:   true,
+		},
+		{
+			name:   "rebase only is not analysis only",
+			config: Config{Rebase: true},
+			want:   false,
+		},
+		{
+			name:   "merge only is not analysis only",
+			config: Config{Merge: true},
+			want:   false,
+		},
+		{
+			name:   "both rebase and merge is not analysis only",
+			config: Config{Rebase: true, Merge: true},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.config.IsAnalysisOnly(); got != tt.want {
+				t.Errorf("IsAnalysisOnly() = %v, want %v", got, tt.want)
 			}
 		})
 	}

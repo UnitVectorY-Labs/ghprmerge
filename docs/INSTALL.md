@@ -48,13 +48,13 @@ Download `ghprmerge_windows_amd64.exe` from the releases page and add it to your
 ```bash
 git clone https://github.com/UnitVectorY-Labs/ghprmerge.git
 cd ghprmerge
-go build -o ghprmerge ./cmd/ghprmerge
+go build -o ghprmerge .
 ```
 
 ### Install to GOPATH
 
 ```bash
-go install github.com/UnitVectorY-Labs/ghprmerge/cmd/ghprmerge@latest
+go install github.com/UnitVectorY-Labs/ghprmerge@latest
 ```
 
 ## Verify Installation

@@ -10,7 +10,7 @@ import (
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/output"
 )
 
-func TestMergerDryRun(t *testing.T) {
+func TestMergerAnalysisOnly(t *testing.T) {
 	mock := github.NewMockClient()
 	mock.Repositories = []github.Repository{
 		{
@@ -41,8 +41,8 @@ func TestMergerDryRun(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
 		Rebase:       false,
+		Merge:        false, // Analysis only mode
 	}
 
 	m := New(mock, cfg)
@@ -53,7 +53,7 @@ func TestMergerDryRun(t *testing.T) {
 
 	// Verify no mutations were made
 	if len(mock.MergeCalls) > 0 {
-		t.Errorf("Expected no merge calls in dry run, got %d", len(mock.MergeCalls))
+		t.Errorf("Expected no merge calls in analysis mode, got %d", len(mock.MergeCalls))
 	}
 
 	// Verify result
@@ -70,6 +70,67 @@ func TestMergerDryRun(t *testing.T) {
 	}
 	if result.Repositories[0].PullRequests[0].Action != output.ActionWouldMerge {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionWouldMerge)
+	}
+
+	// Verify mode description
+	if result.Metadata.Mode != "analysis only (no mutations)" {
+		t.Errorf("Mode = %v, want 'analysis only (no mutations)'", result.Metadata.Mode)
+	}
+}
+
+func TestMergerMergeOnly(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       false,
+		Merge:        true, // Merge mode
+	}
+
+	m := New(mock, cfg)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify merge was called
+	if len(mock.MergeCalls) != 1 {
+		t.Errorf("Expected 1 merge call, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify result
+	if result.Summary.MergedSuccess != 1 {
+		t.Errorf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+
+	if result.Repositories[0].PullRequests[0].Action != output.ActionMerged {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionMerged)
 	}
 }
 
@@ -98,14 +159,13 @@ func TestMergerSkipsFailingChecks(t *testing.T) {
 	}
 	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
 		AllPassing: false,
-		Details:    "CI failed",
+		Details:    "check 'CI' has conclusion 'failure'",
 	}
 
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       false,
-		Rebase:       false,
+		Merge:        true,
 	}
 
 	m := New(mock, cfg)
@@ -124,8 +184,8 @@ func TestMergerSkipsFailingChecks(t *testing.T) {
 		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
 	}
 
-	if result.Repositories[0].PullRequests[0].Action != output.ActionSkippedChecks {
-		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkippedChecks)
+	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipChecksFailing {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipChecksFailing)
 	}
 }
 
@@ -167,8 +227,8 @@ func TestMergerSkipsOutdatedBranch(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       false,
 		Rebase:       false, // Rebase disabled
+		Merge:        true,
 	}
 
 	m := New(mock, cfg)
@@ -186,8 +246,8 @@ func TestMergerSkipsOutdatedBranch(t *testing.T) {
 	if result.Summary.Skipped != 1 {
 		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
 	}
-	if result.Repositories[0].PullRequests[0].Action != output.ActionSkippedOutdated {
-		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkippedOutdated)
+	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipBranchBehind {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipBranchBehind)
 	}
 }
 
@@ -229,8 +289,7 @@ func TestMergerSkipsConflicts(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       false,
-		Rebase:       false,
+		Merge:        true,
 	}
 
 	m := New(mock, cfg)
@@ -243,8 +302,8 @@ func TestMergerSkipsConflicts(t *testing.T) {
 	if result.Summary.Skipped != 1 {
 		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
 	}
-	if result.Repositories[0].PullRequests[0].Action != output.ActionSkippedConflict {
-		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkippedConflict)
+	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipConflict {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipConflict)
 	}
 }
 
@@ -285,8 +344,6 @@ func TestMergerSkipsArchivedRepos(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
-		Rebase:       false,
 	}
 
 	m := New(mock, cfg)
@@ -296,8 +353,8 @@ func TestMergerSkipsArchivedRepos(t *testing.T) {
 	}
 
 	// Should only have active-repo
-	if result.Summary.TotalRepositories != 1 {
-		t.Errorf("TotalRepositories = %d, want 1", result.Summary.TotalRepositories)
+	if result.Summary.ReposProcessed != 1 {
+		t.Errorf("ReposProcessed = %d, want 1", result.Summary.ReposProcessed)
 	}
 	if len(result.Repositories) != 1 {
 		t.Fatalf("Expected 1 repository, got %d", len(result.Repositories))
@@ -349,8 +406,6 @@ func TestMergerSkipsDrafts(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
-		Rebase:       false,
 	}
 
 	m := New(mock, cfg)
@@ -360,8 +415,8 @@ func TestMergerSkipsDrafts(t *testing.T) {
 	}
 
 	// Should only process non-draft PR
-	if result.Summary.TotalPullRequests != 1 {
-		t.Errorf("TotalPullRequests = %d, want 1", result.Summary.TotalPullRequests)
+	if result.Summary.CandidatesFound != 1 {
+		t.Errorf("CandidatesFound = %d, want 1", result.Summary.CandidatesFound)
 	}
 	if result.Repositories[0].PullRequests[0].Number != 2 {
 		t.Errorf("Expected PR #2, got #%d", result.Repositories[0].PullRequests[0].Number)
@@ -394,8 +449,6 @@ func TestMergerRepoFilter(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
-		Rebase:       false,
 		Repos:        []string{"repo1", "repo3"}, // Only these repos
 	}
 
@@ -406,8 +459,8 @@ func TestMergerRepoFilter(t *testing.T) {
 	}
 
 	// Should only have 2 repos
-	if result.Summary.TotalRepositories != 2 {
-		t.Errorf("TotalRepositories = %d, want 2", result.Summary.TotalRepositories)
+	if result.Summary.ReposProcessed != 2 {
+		t.Errorf("ReposProcessed = %d, want 2", result.Summary.ReposProcessed)
 	}
 
 	// Verify correct repos
@@ -426,7 +479,7 @@ func TestMergerRepoFilter(t *testing.T) {
 	}
 }
 
-func TestMergerLimit(t *testing.T) {
+func TestMergerRepoLimit(t *testing.T) {
 	mock := github.NewMockClient()
 	mock.Repositories = []github.Repository{
 		{
@@ -435,52 +488,24 @@ func TestMergerLimit(t *testing.T) {
 			DefaultBranch: "main",
 			Archived:      false,
 		},
-	}
-	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
 		{
-			Number:     1,
-			Title:      "PR 1",
-			URL:        "https://github.com/testorg/repo1/pull/1",
-			HeadBranch: "dependabot/npm/pkg1",
-			BaseBranch: "main",
-			State:      "open",
-			Draft:      false,
-			HeadSHA:    "sha1",
-			RepoName:   "repo1",
+			Name:          "repo2",
+			FullName:      "testorg/repo2",
+			DefaultBranch: "main",
+			Archived:      false,
 		},
 		{
-			Number:     2,
-			Title:      "PR 2",
-			URL:        "https://github.com/testorg/repo1/pull/2",
-			HeadBranch: "dependabot/npm/pkg2",
-			BaseBranch: "main",
-			State:      "open",
-			Draft:      false,
-			HeadSHA:    "sha2",
-			RepoName:   "repo1",
-		},
-		{
-			Number:     3,
-			Title:      "PR 3",
-			URL:        "https://github.com/testorg/repo1/pull/3",
-			HeadBranch: "dependabot/npm/pkg3",
-			BaseBranch: "main",
-			State:      "open",
-			Draft:      false,
-			HeadSHA:    "sha3",
-			RepoName:   "repo1",
+			Name:          "repo3",
+			FullName:      "testorg/repo3",
+			DefaultBranch: "main",
+			Archived:      false,
 		},
 	}
-	mock.CheckStatuses["testorg/repo1/sha1"] = &github.CheckStatus{AllPassing: true}
-	mock.CheckStatuses["testorg/repo1/sha2"] = &github.CheckStatus{AllPassing: true}
-	mock.CheckStatuses["testorg/repo1/sha3"] = &github.CheckStatus{AllPassing: true}
 
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
-		Rebase:       false,
-		Limit:        2, // Only merge 2
+		RepoLimit:    2, // Only process 2 repos
 	}
 
 	m := New(mock, cfg)
@@ -489,18 +514,12 @@ func TestMergerLimit(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	// Should have 2 would-merge and 1 skipped due to limit
-	if result.Summary.WouldMerge != 2 {
-		t.Errorf("WouldMerge = %d, want 2", result.Summary.WouldMerge)
+	// Should have 2 processed and 1 skipped
+	if result.Summary.ReposProcessed != 2 {
+		t.Errorf("ReposProcessed = %d, want 2", result.Summary.ReposProcessed)
 	}
-	if result.Summary.Skipped != 1 {
-		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
-	}
-
-	// Verify third PR was skipped due to limit
-	prs := result.Repositories[0].PullRequests
-	if prs[2].Action != output.ActionSkippedLimit {
-		t.Errorf("Third PR action = %v, want %v", prs[2].Action, output.ActionSkippedLimit)
+	if result.Summary.ReposSkipped != 1 {
+		t.Errorf("ReposSkipped = %d, want 1", result.Summary.ReposSkipped)
 	}
 }
 
@@ -543,8 +562,6 @@ func TestMergerSourceBranchFiltering(t *testing.T) {
 	cfg := &config.Config{
 		Org:          "testorg",
 		SourceBranch: "dependabot/",
-		DryRun:       true,
-		Rebase:       false,
 	}
 
 	m := New(mock, cfg)
@@ -554,10 +571,75 @@ func TestMergerSourceBranchFiltering(t *testing.T) {
 	}
 
 	// Should only process dependabot PR
-	if result.Summary.TotalPullRequests != 1 {
-		t.Errorf("TotalPullRequests = %d, want 1", result.Summary.TotalPullRequests)
+	if result.Summary.CandidatesFound != 1 {
+		t.Errorf("CandidatesFound = %d, want 1", result.Summary.CandidatesFound)
 	}
 	if result.Repositories[0].PullRequests[0].Number != 1 {
 		t.Errorf("Expected PR #1, got #%d", result.Repositories[0].PullRequests[0].Number)
+	}
+}
+
+func TestMergerRebaseOnly(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+	// Branch is behind
+	key := fmt.Sprintf("testorg/repo1/%c", rune(1))
+	mock.BranchStatuses[key] = &github.BranchStatus{
+		UpToDate:    false,
+		BehindBy:    3,
+		HasConflict: false,
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       true,
+		Merge:        false, // Rebase only, no merge
+	}
+
+	m := New(mock, cfg)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify rebase was done but not merge
+	if len(mock.PostRebaseCalls) != 1 {
+		t.Errorf("Expected 1 rebase call, got %d", len(mock.PostRebaseCalls))
+	}
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("Expected 0 merge calls in rebase-only mode, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify result
+	if result.Summary.RebasedSuccess != 1 {
+		t.Errorf("RebasedSuccess = %d, want 1", result.Summary.RebasedSuccess)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
 	}
 }

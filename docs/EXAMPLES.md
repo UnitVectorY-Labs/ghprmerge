@@ -1,6 +1,6 @@
 # Examples
 
-## Basic Dry Run
+## Default Analysis Run
 
 Preview what would happen without making any changes:
 
@@ -8,87 +8,109 @@ Preview what would happen without making any changes:
 ghprmerge --org myorg --source-branch dependabot/
 ```
 
-This scans all repositories in `myorg` for open pull requests with branches containing `dependabot/` and reports what would be merged.
+This scans all repositories, evaluates PRs, and reports what would be rebased and merged.
 
-## Merge Dependabot Pull Requests
+## Rebase Only Run
 
-Merge all ready Dependabot pull requests:
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/ --dry-run=false
-```
-
-## Merge with Auto-Rebase
-
-Automatically update out-of-date branches before merging:
+Update out-of-date branches without merging:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --dry-run=false --rebase
+ghprmerge --org myorg --source-branch dependabot/ --rebase
 ```
 
-For Dependabot PRs, this posts a `@dependabot rebase` comment. For other branches, it uses GitHub's update branch API.
+For Dependabot branches, this posts a `@dependabot rebase` comment. For other branches, it uses GitHub's update branch API.
 
-## Limit Number of Merges
+## Merge Only Run
 
-Merge at most 10 pull requests (useful for gradual rollout):
+Merge PRs that are already in a valid state (up-to-date, checks passing):
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --dry-run=false --limit 10
+ghprmerge --org myorg --source-branch dependabot/ --merge
 ```
 
-## Scope to Specific Repositories
+PRs that are behind the default branch will be skipped (use `--rebase` to update them first).
+
+## Rebase Then Merge Run
+
+Update branches and merge in one run:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
+```
+
+Note: If checks become pending after a rebase, the PR is reported as "updated, awaiting checks" and skipped for merging in that run.
+
+## Scoped Repository Run
 
 Only process specific repositories:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --repo repo1 --repo repo2
+ghprmerge --org myorg --source-branch dependabot/ --repo repo1 --repo repo2 --merge
 ```
 
-## JSON Output
+## Dependabot Focused Run
 
-Get structured JSON output for scripting:
+Match only Dependabot npm updates:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --json
+ghprmerge --org myorg --source-branch dependabot/npm_and_yarn/ --merge
+```
+
+Match only Go module updates:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/go_modules/ --merge
+```
+
+## Limited Run
+
+Process at most 10 repositories:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --repo-limit 10 --merge
+```
+
+## JSON Output for Scripting
+
+Get structured output for automation:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --json | jq '.summary'
+```
+
+Pipe to other tools:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --json | \
+  jq -r '.repositories[].pull_requests[] | select(.action == "would merge") | .url'
 ```
 
 ## Using Environment Variables
 
-Set the organization via environment variable:
-
 ```bash
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 export GITHUB_ORG=myorg
+
 ghprmerge --source-branch dependabot/
 ```
 
-## Complete Production Example
-
-A complete example for merging Dependabot PRs across an organization:
+## Complete Production Workflow
 
 ```bash
 # Set authentication
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 
-# Dry run first to preview
+# Step 1: Analyze what's available
 ghprmerge --org myorg --source-branch dependabot/
 
-# If everything looks good, perform actual merges
-ghprmerge --org myorg --source-branch dependabot/ --dry-run=false --rebase --limit 50
-```
+# Step 2: Rebase out-of-date branches
+ghprmerge --org myorg --source-branch dependabot/ --rebase
 
-## Filtering by Package Ecosystem
+# Step 3: Wait for checks to complete (manual or scripted)
+sleep 300
 
-Match specific package managers:
-
-```bash
-# Only npm updates
-ghprmerge --org myorg --source-branch dependabot/npm_and_yarn/
-
-# Only Go module updates  
-ghprmerge --org myorg --source-branch dependabot/go_modules/
-
-# Only Maven updates
-ghprmerge --org myorg --source-branch dependabot/maven/
+# Step 4: Merge ready PRs
+ghprmerge --org myorg --source-branch dependabot/ --merge
 ```
 
 ## CI/CD Usage
@@ -106,17 +128,18 @@ jobs:
   merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Merge Dependabot PRs
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+      - name: Download ghprmerge
         run: |
-          # Download ghprmerge
           curl -L https://github.com/UnitVectorY-Labs/ghprmerge/releases/latest/download/ghprmerge_linux_amd64 -o ghprmerge
           chmod +x ghprmerge
-          
-          # Preview first
-          ./ghprmerge --org myorg --source-branch dependabot/ --json
-          
-          # Merge with limit
-          ./ghprmerge --org myorg --source-branch dependabot/ --dry-run=false --rebase --limit 20
+
+      - name: Analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: ./ghprmerge --org myorg --source-branch dependabot/ --json
+
+      - name: Merge ready PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: ./ghprmerge --org myorg --source-branch dependabot/ --merge --repo-limit 20
 ```

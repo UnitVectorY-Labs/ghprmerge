@@ -16,8 +16,9 @@ func TestWriterHumanOutput(t *testing.T) {
 		Metadata: RunMetadata{
 			Org:          "test-org",
 			SourceBranch: "dependabot/",
-			DryRun:       true,
+			Mode:         "analysis only (no mutations)",
 			Rebase:       false,
+			Merge:        false,
 			StartTime:    time.Now(),
 			EndTime:      time.Now(),
 		},
@@ -39,9 +40,9 @@ func TestWriterHumanOutput(t *testing.T) {
 			},
 		},
 		Summary: RunSummary{
-			TotalRepositories: 1,
-			TotalPullRequests: 1,
-			WouldMerge:        1,
+			ReposProcessed:  1,
+			CandidatesFound: 1,
+			WouldMerge:      1,
 		},
 	}
 
@@ -56,17 +57,15 @@ func TestWriterHumanOutput(t *testing.T) {
 	checks := []string{
 		"test-org",
 		"dependabot/",
-		"dry-run",
 		"test-org/repo1",
 		"main",
-		"PR #1",
-		"Bump lodash to 4.17.21",
+		"#1",
 		"would merge",
 	}
 
 	for _, check := range checks {
 		if !strings.Contains(output, check) {
-			t.Errorf("Output missing expected string: %q", check)
+			t.Errorf("Output missing expected string: %q\nOutput was:\n%s", check, output)
 		}
 	}
 }
@@ -79,8 +78,9 @@ func TestWriterJSONOutput(t *testing.T) {
 		Metadata: RunMetadata{
 			Org:          "test-org",
 			SourceBranch: "dependabot/",
-			DryRun:       true,
+			Mode:         "analysis only",
 			Rebase:       false,
+			Merge:        false,
 			StartTime:    time.Now(),
 			EndTime:      time.Now(),
 		},
@@ -102,9 +102,9 @@ func TestWriterJSONOutput(t *testing.T) {
 			},
 		},
 		Summary: RunSummary{
-			TotalRepositories: 1,
-			TotalPullRequests: 1,
-			WouldMerge:        1,
+			ReposProcessed:  1,
+			CandidatesFound: 1,
+			WouldMerge:      1,
 		},
 	}
 
@@ -142,10 +142,10 @@ func TestActionConstants(t *testing.T) {
 	}{
 		{ActionWouldMerge, "would merge"},
 		{ActionMerged, "merged"},
-		{ActionWouldRebase, "would rebase then merge"},
-		{ActionSkippedChecks, "skipped checks failing"},
-		{ActionSkippedOutdated, "skipped branch out of date"},
-		{ActionSkippedConflict, "skipped merge conflict"},
+		{ActionWouldRebase, "would rebase"},
+		{ActionSkipChecksFailing, "skip: checks failing"},
+		{ActionSkipBranchBehind, "skip: branch behind default"},
+		{ActionSkipConflict, "skip: merge conflict"},
 	}
 
 	for _, tt := range tests {

@@ -38,6 +38,8 @@ type PullRequest struct {
 // CheckStatus represents the overall status of checks on a commit.
 type CheckStatus struct {
 	AllPassing bool
+	Pending    bool
+	NoChecks   bool
 	Details    string
 }
 
@@ -209,24 +211,52 @@ func (c *RealClient) GetCheckStatus(ctx context.Context, owner, repo, ref string
 		return nil, fmt.Errorf("failed to get commit status: %w", err)
 	}
 
+	// Check if there are no checks at all
+	if len(checkRuns.CheckRuns) == 0 && len(combinedStatus.Statuses) == 0 {
+		return &CheckStatus{
+			AllPassing: false,
+			NoChecks:   true,
+			Details:    "no checks found",
+		}, nil
+	}
+
 	// Check all check runs
 	for _, check := range checkRuns.CheckRuns {
+		status := check.GetStatus()
 		conclusion := check.GetConclusion()
+
+		// Check if still in progress
+		if status == "queued" || status == "in_progress" {
+			return &CheckStatus{
+				AllPassing: false,
+				Pending:    true,
+				Details:    fmt.Sprintf("check '%s' is %s", check.GetName(), status),
+			}, nil
+		}
+
 		// Only "success" is considered passing
 		if conclusion != "success" {
 			return &CheckStatus{
 				AllPassing: false,
-				Details:    fmt.Sprintf("check run '%s' has conclusion '%s'", check.GetName(), conclusion),
+				Details:    fmt.Sprintf("check '%s' has conclusion '%s'", check.GetName(), conclusion),
 			}, nil
 		}
 	}
 
 	// Check all commit statuses
 	for _, status := range combinedStatus.Statuses {
-		if status.GetState() != "success" {
+		state := status.GetState()
+		if state == "pending" {
 			return &CheckStatus{
 				AllPassing: false,
-				Details:    fmt.Sprintf("commit status '%s' has state '%s'", status.GetContext(), status.GetState()),
+				Pending:    true,
+				Details:    fmt.Sprintf("status '%s' is pending", status.GetContext()),
+			}, nil
+		}
+		if state != "success" {
+			return &CheckStatus{
+				AllPassing: false,
+				Details:    fmt.Sprintf("status '%s' has state '%s'", status.GetContext(), state),
 			}, nil
 		}
 	}

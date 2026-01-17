@@ -1,9 +1,49 @@
 # ghprmerge Documentation
 
-This directory contains the documentation for ghprmerge.
+## Purpose
+
+ghprmerge solves the problem of merging many similar pull requests across a GitHub organization. When you have dozens or hundreds of repositories with Dependabot (or similar automated) PRs, manually reviewing and merging each one becomes impractical.
+
+## Safety Model
+
+ghprmerge is designed to be **safe by default**:
+
+1. **Default is analysis only** - Without explicit `--rebase` or `--merge` flags, the tool only scans and reports what it would do
+2. **Explicit action flags** - Use `--rebase` to update branches, `--merge` to merge PRs
+3. **Strict readiness checks** - A PR is only considered ready if:
+   - All check runs have a successful conclusion (including non-required checks)
+   - All commit status contexts are successful
+   - No merge conflicts
+   - Branch is fully up to date with the default branch
+4. **Sequential processing** - Repositories are processed one at a time, never in parallel
+5. **No local checkout** - All operations use the GitHub API
+
+## Non-Goals
+
+- No local git operations or repository checkouts
+- No parallel repository operations
+- No creating or approving pull requests
+- No modifying repository settings
+
+## Execution Flow
+
+```
+scan → evaluate → optional rebase → optional merge → report
+```
+
+For each repository (processed sequentially):
+
+1. Fetch repository metadata including default branch
+2. Enumerate candidate PRs matching `--source-branch` pattern
+3. For each candidate PR:
+   - Evaluate readiness (checks, conflicts, branch status)
+   - If `--rebase`: update branch if behind
+   - If `--merge` and PR is valid: attempt merge
+   - Record result immediately
+4. Print per-repository summary
 
 ## Contents
 
-- [USAGE.md](USAGE.md) - Complete command-line reference, flags, environment variables, and behavior explanations
-- [EXAMPLES.md](EXAMPLES.md) - Practical example commands for common use cases
-- [INSTALL.md](INSTALL.md) - Installation instructions including binary download and building from source
+- [USAGE.md](USAGE.md) - Complete command-line reference with flag table
+- [EXAMPLES.md](EXAMPLES.md) - Practical example commands and workflows
+- [INSTALL.md](INSTALL.md) - Installation instructions

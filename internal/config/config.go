@@ -25,12 +25,17 @@ func (s *StringSliceFlag) Set(value string) error {
 type Config struct {
 	Org          string
 	SourceBranch string
-	DryRun       bool
 	Rebase       bool
+	Merge        bool
 	Repos        []string
-	Limit        int
+	RepoLimit    int
 	JSON         bool
 	Token        string
+}
+
+// IsAnalysisOnly returns true if neither --rebase nor --merge is set.
+func (c *Config) IsAnalysisOnly() bool {
+	return !c.Rebase && !c.Merge
 }
 
 // Validate checks that all required configuration is present.
@@ -58,9 +63,9 @@ func ParseFlags(args []string) (*Config, error) {
 
 	org := fs.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
 	sourceBranch := fs.String("source-branch", "", "Branch name pattern to match pull request head branches")
-	dryRun := fs.Bool("dry-run", true, "When enabled, no mutations are performed")
-	rebase := fs.Bool("rebase", false, "When enabled, out-of-date pull request branches are updated before merging")
-	limit := fs.Int("limit", 0, "Maximum number of pull requests to merge in a single run (0 = unlimited)")
+	rebase := fs.Bool("rebase", false, "Update out-of-date branches (does not merge unless --merge is also set)")
+	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state")
+	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
 
 	fs.Var(&repos, "repo", "Limit execution to specific repositories (may be repeated)")
@@ -75,10 +80,10 @@ func ParseFlags(args []string) (*Config, error) {
 	return &Config{
 		Org:          *org,
 		SourceBranch: *sourceBranch,
-		DryRun:       *dryRun,
 		Rebase:       *rebase,
+		Merge:        *merge,
 		Repos:        repos,
-		Limit:        *limit,
+		RepoLimit:    *repoLimit,
 		JSON:         *jsonOutput,
 		Token:        token,
 	}, nil
