@@ -1,8 +1,8 @@
 # ghprmerge
 
-A command-line tool to safely merge large numbers of similar GitHub pull requests across an organization.
+A command-line tool to automatically evaluate, merge, and optionally rebase GitHub pull requests sharing the same source branch across an organization.
 
-Primary use case: merging automated dependency update pull requests (e.g., Dependabot) without requiring repositories to be checked out locally.
+Use case: merging automated dependency update pull requests (e.g., Dependabot) without requiring clicking through each repository individually.
 
 ## Quick Start
 
