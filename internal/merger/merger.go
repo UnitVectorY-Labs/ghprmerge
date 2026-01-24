@@ -99,9 +99,9 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			continue
 		}
 
-		// In quiet mode, don't log repos with no matching PRs
-		// We need to process first and then decide whether to log
-		// In confirm mode, only scan without actions
+		// Process the repository first to determine if it has matching PRs.
+		// This is needed because in quiet mode, we only log repos that have
+		// matching PRs or were skipped (e.g., API errors, repo limit).
 		var repoResult output.RepositoryResult
 		if m.config.Confirm {
 			repoResult = m.processRepositoryScanOnly(ctx, repo)
@@ -111,7 +111,8 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		result.Repositories = append(result.Repositories, repoResult)
 
 		// In quiet mode, skip logging repos with no matching PRs and no skip reason
-		shouldLogRepo := !m.config.Quiet || repoResult.Skipped || len(repoResult.PullRequests) > 0
+		hasContent := repoResult.Skipped || len(repoResult.PullRequests) > 0
+		shouldLogRepo := !m.config.Quiet || hasContent
 		if shouldLogRepo {
 			m.log("[%d/%d] %s", i+1, len(repos), repo.FullName)
 		}
