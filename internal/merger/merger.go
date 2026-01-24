@@ -99,8 +99,8 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			continue
 		}
 
-		m.log("[%d/%d] %s", i+1, len(repos), repo.FullName)
-
+		// In quiet mode, don't log repos with no matching PRs
+		// We need to process first and then decide whether to log
 		// In confirm mode, only scan without actions
 		var repoResult output.RepositoryResult
 		if m.config.Confirm {
@@ -110,6 +110,12 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		}
 		result.Repositories = append(result.Repositories, repoResult)
 
+		// In quiet mode, skip logging repos with no matching PRs and no skip reason
+		shouldLogRepo := !m.config.Quiet || repoResult.Skipped || len(repoResult.PullRequests) > 0
+		if shouldLogRepo {
+			m.log("[%d/%d] %s", i+1, len(repos), repo.FullName)
+		}
+
 		if repoResult.Skipped {
 			result.Summary.ReposSkipped++
 			m.log("      ⊘ Repository skipped: %s", repoResult.SkipReason)
@@ -118,7 +124,9 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			repoCount++
 
 			if len(repoResult.PullRequests) == 0 {
-				m.log("      No matching pull requests")
+				if !m.config.Quiet {
+					m.log("      No matching pull requests")
+				}
 			} else {
 				// Log each PR with its complete status on one line
 				for _, pr := range repoResult.PullRequests {

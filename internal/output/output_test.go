@@ -10,7 +10,7 @@ import (
 
 func TestWriterHumanOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false)
+	writer := NewWriter(&buf, false, false)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -72,7 +72,7 @@ func TestWriterHumanOutput(t *testing.T) {
 
 func TestWriterJSONOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, true)
+	writer := NewWriter(&buf, true, false)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -154,5 +154,107 @@ func TestActionConstants(t *testing.T) {
 				t.Errorf("Action = %v, want %v", tt.action, tt.want)
 			}
 		})
+	}
+}
+
+func TestWriterQuietModeHidesEmptyRepos(t *testing.T) {
+	var buf bytes.Buffer
+	writer := NewWriter(&buf, false, true) // quiet mode enabled
+
+	result := &RunResult{
+		Metadata: RunMetadata{
+			Org:          "test-org",
+			SourceBranch: "dependabot/",
+			Mode:         "analysis only (no mutations)",
+		},
+		Repositories: []RepositoryResult{
+			{
+				Name:          "repo-with-pr",
+				FullName:      "test-org/repo-with-pr",
+				DefaultBranch: "main",
+				PullRequests: []PullRequestResult{
+					{
+						Number:     1,
+						HeadBranch: "dependabot/npm/lodash",
+						Title:      "Bump lodash",
+						Action:     ActionWouldMerge,
+					},
+				},
+			},
+			{
+				Name:          "repo-without-pr",
+				FullName:      "test-org/repo-without-pr",
+				DefaultBranch: "main",
+				PullRequests:  []PullRequestResult{},
+			},
+		},
+		Summary: RunSummary{
+			ReposProcessed:  2,
+			CandidatesFound: 1,
+		},
+	}
+
+	err := writer.WriteResult(result)
+	if err != nil {
+		t.Fatalf("WriteResult() error = %v", err)
+	}
+
+	output := buf.String()
+
+	// Repo with PR should be shown
+	if !strings.Contains(output, "repo-with-pr") {
+		t.Error("Expected repo-with-pr to be in output")
+	}
+
+	// Repo without PR should NOT be shown in quiet mode
+	if strings.Contains(output, "repo-without-pr") {
+		t.Error("Expected repo-without-pr to NOT be in output in quiet mode")
+	}
+
+	// "No matching pull requests" should NOT be in output
+	if strings.Contains(output, "No matching pull requests") {
+		t.Error("Expected 'No matching pull requests' to NOT be in output in quiet mode")
+	}
+}
+
+func TestWriterNonQuietModeShowsEmptyRepos(t *testing.T) {
+	var buf bytes.Buffer
+	writer := NewWriter(&buf, false, false) // quiet mode disabled
+
+	result := &RunResult{
+		Metadata: RunMetadata{
+			Org:          "test-org",
+			SourceBranch: "dependabot/",
+			Mode:         "analysis only (no mutations)",
+		},
+		Repositories: []RepositoryResult{
+			{
+				Name:          "repo-without-pr",
+				FullName:      "test-org/repo-without-pr",
+				DefaultBranch: "main",
+				PullRequests:  []PullRequestResult{},
+			},
+		},
+		Summary: RunSummary{
+			ReposProcessed:  1,
+			CandidatesFound: 0,
+		},
+	}
+
+	err := writer.WriteResult(result)
+	if err != nil {
+		t.Fatalf("WriteResult() error = %v", err)
+	}
+
+	output := buf.String()
+
+	// Repo should be shown
+	if !strings.Contains(output, "repo-without-pr") {
+		t.Error("Expected repo-without-pr to be in output")
+	}
+
+	// "No matching pull requests" SHOULD be in output
+	if !strings.Contains(output, "No matching pull requests") {
+		t.Error("Expected 'No matching pull requests' to be in output")
 	}
 }

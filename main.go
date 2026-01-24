@@ -71,7 +71,7 @@ func run() error {
 	}
 
 	// Output results
-	writer := output.NewWriter(os.Stdout, cfg.JSON)
+	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.Quiet)
 	return writer.WriteResult(result)
 }
 
