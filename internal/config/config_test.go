@@ -25,6 +25,7 @@ func TestParseFlags(t *testing.T) {
 		wantMerge     bool
 		wantRepoLimit int
 		wantJSON      bool
+		wantQuiet     bool
 		wantRepos     []string
 		wantErr       bool
 	}{
@@ -38,6 +39,7 @@ func TestParseFlags(t *testing.T) {
 			wantMerge:     false,
 			wantRepoLimit: 10,
 			wantJSON:      true,
+			wantQuiet:     false,
 		},
 		{
 			name:          "defaults applied",
@@ -84,6 +86,14 @@ func TestParseFlags(t *testing.T) {
 			wantRebase: false,
 			wantMerge:  true,
 		},
+		{
+			name:       "quiet mode",
+			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--quiet"},
+			envToken:   "test-token",
+			wantOrg:    "myorg",
+			wantBranch: "dependabot/",
+			wantQuiet:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -116,6 +126,9 @@ func TestParseFlags(t *testing.T) {
 			}
 			if cfg.JSON != tt.wantJSON {
 				t.Errorf("JSON = %v, want %v", cfg.JSON, tt.wantJSON)
+			}
+			if cfg.Quiet != tt.wantQuiet {
+				t.Errorf("Quiet = %v, want %v", cfg.Quiet, tt.wantQuiet)
 			}
 			if len(tt.wantRepos) > 0 {
 				if len(cfg.Repos) != len(tt.wantRepos) {

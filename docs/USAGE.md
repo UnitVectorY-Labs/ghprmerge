@@ -18,6 +18,7 @@ ghprmerge [flags]
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
 | `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
+| `--quiet` | `false` | No | Reduce output by suppressing repos with no matching pull requests |
 | `--version` | - | No | Show version information and exit |
 
 ## Environment Variables

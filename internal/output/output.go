@@ -116,15 +116,17 @@ type RunSummary struct {
 
 // Writer handles output formatting.
 type Writer struct {
-	out      io.Writer
-	jsonMode bool
+	out       io.Writer
+	jsonMode  bool
+	quietMode bool
 }
 
 // NewWriter creates a new Writer.
-func NewWriter(out io.Writer, jsonMode bool) *Writer {
+func NewWriter(out io.Writer, jsonMode bool, quietMode bool) *Writer {
 	return &Writer{
-		out:      out,
-		jsonMode: jsonMode,
+		out:       out,
+		jsonMode:  jsonMode,
+		quietMode: quietMode,
 	}
 }
 
@@ -159,6 +161,11 @@ func (w *Writer) writeHuman(result *RunResult) error {
 
 	// Print each repository
 	for _, repo := range result.Repositories {
+		// In quiet mode, skip repos with no matching PRs and no skip reason
+		if w.quietMode && !repo.Skipped && len(repo.PullRequests) == 0 {
+			continue
+		}
+
 		fmt.Fprintf(w.out, "┌─ %s (default: %s)\n", repo.FullName, repo.DefaultBranch)
 
 		if repo.Skipped {
