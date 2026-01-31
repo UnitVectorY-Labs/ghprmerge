@@ -3,6 +3,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
@@ -714,7 +715,7 @@ func TestMergerSkipRebaseWithMerge(t *testing.T) {
 
 	// Verify reason mentions branch was behind and rebase was skipped
 	reason := result.Repositories[0].PullRequests[0].Reason
-	if !containsString(reason, "behind") || !containsString(reason, "skipped") {
+	if !strings.Contains(reason, "behind") || !strings.Contains(reason, "skipped") {
 		t.Errorf("Reason should mention branch was behind and rebase skipped, got: %s", reason)
 	}
 }
@@ -836,17 +837,4 @@ func TestMergerSkipRebaseWithFailingChecks(t *testing.T) {
 	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipChecksFailing {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipChecksFailing)
 	}
-}
-
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr))
-}
-
-func containsAt(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
