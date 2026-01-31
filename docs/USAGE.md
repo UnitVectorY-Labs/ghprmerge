@@ -12,8 +12,9 @@ ghprmerge [flags]
 |------|---------|---------------|-------------|
 | `--org` | `GITHUB_ORG` env | No | GitHub organization to scan (required) |
 | `--source-branch` | - | No | Branch pattern to match PR head branches (required) |
-| `--rebase` | `false` | **Yes** | Update out-of-date branches (mutually exclusive with --merge) |
+| `--rebase` | `false` | **Yes** | Update out-of-date branches (mutually exclusive with --merge and --skip-rebase) |
 | `--merge` | `false` | **Yes** | Merge PRs that are in a valid state (mutually exclusive with --rebase) |
+| `--skip-rebase` | `false` | **Yes** | Skip rebase check and merge PRs that are behind (requires --merge, mutually exclusive with --rebase) |
 | `--repo` | - | No | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
@@ -62,6 +63,18 @@ ghprmerge --org myorg --source-branch dependabot/ --merge
 - Merges PRs that are already in a valid state (up-to-date, checks passing)
 - **Does NOT attempt any rebases** - rebase and merge are mutually exclusive
 - Skips PRs that are behind with a clear reason
+
+### Merge with Skip Rebase
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
+```
+
+- Merges PRs even if they are behind the default branch
+- Still requires all checks to be passing and no merge conflicts
+- Useful when the repository doesn't require branches to be up-to-date before merging
+- **Does NOT rebase** - the `--skip-rebase` flag skips the rebase requirement entirely
+- Cannot be used with `--rebase` (mutually exclusive)
 
 ### Confirmation Mode
 

@@ -9,12 +9,12 @@ ghprmerge solves the problem of merging many similar pull requests across a GitH
 ghprmerge is designed to be **safe by default**:
 
 1. **Default is analysis only** - Without explicit `--rebase` or `--merge` flags, the tool only scans and reports what it would do
-2. **Explicit action flags** - Use `--rebase` to update branches, `--merge` to merge PRs
+2. **Explicit action flags** - Use `--rebase` to update branches, `--merge` to merge PRs, or `--merge --skip-rebase` to merge without requiring up-to-date branches
 3. **Strict readiness checks** - A PR is only considered ready if:
    - All check runs have a successful conclusion (including non-required checks)
    - All commit status contexts are successful
    - No merge conflicts
-   - Branch is fully up to date with the default branch
+   - Branch is fully up to date with the default branch (unless `--skip-rebase` is used)
 4. **Sequential processing** - Repositories are processed one at a time, never in parallel
 5. **No local checkout** - All operations use the GitHub API
 
@@ -39,6 +39,7 @@ For each repository (processed sequentially):
    - Evaluate readiness (checks, conflicts, branch status)
    - If `--rebase`: update branch if behind
    - If `--merge` and PR is valid: attempt merge
+   - If `--merge --skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
 4. Print per-repository summary
 

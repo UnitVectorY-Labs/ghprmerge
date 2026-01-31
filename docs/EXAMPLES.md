@@ -36,7 +36,19 @@ Merge PRs that are already in a valid state (up-to-date, checks passing):
 ghprmerge --org myorg --source-branch dependabot/ --merge
 ```
 
-PRs that are behind the default branch will be skipped (use `--rebase` first to update them).
+PRs that are behind the default branch will be skipped (use `--rebase` first to update them, or `--skip-rebase` to merge anyway).
+
+## Merge with Skip Rebase
+
+Merge PRs even when they are behind the default branch:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
+```
+
+This is useful when your repository is configured to not require branches to be up-to-date before merging. The `--skip-rebase` flag allows merging without first updating the branch.
+
+**Note**: `--skip-rebase` requires `--merge` and cannot be used with `--rebase`. PRs with merge conflicts or failing checks will still be skipped.
 
 ## Confirmation Mode
 
