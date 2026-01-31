@@ -19,11 +19,11 @@ ghprmerge --org myorg --source-branch dependabot/
 # Rebase out-of-date branches
 ghprmerge --org myorg --source-branch dependabot/ --rebase
 
-# Merge ready PRs
+# Merge ready PRs (that are already up-to-date)
 ghprmerge --org myorg --source-branch dependabot/ --merge
 
-# Rebase and merge in one run
-ghprmerge --org myorg --source-branch dependabot/ --rebase --merge
+# Merge PRs even if behind (skip rebase requirement)
+ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
 
 # Use --confirm to review before taking actions
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm

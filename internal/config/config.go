@@ -28,6 +28,7 @@ type Config struct {
 	SourceBranch string
 	Rebase       bool
 	Merge        bool
+	SkipRebase   bool
 	Repos        []string
 	RepoLimit    int
 	JSON         bool
@@ -56,6 +57,14 @@ func (c *Config) Validate() error {
 	if c.Rebase && c.Merge {
 		return fmt.Errorf("--rebase and --merge are mutually exclusive; use --rebase first to update branches, then --merge after checks pass")
 	}
+	// --skip-rebase and --rebase are mutually exclusive
+	if c.SkipRebase && c.Rebase {
+		return fmt.Errorf("--skip-rebase and --rebase are mutually exclusive; --skip-rebase skips rebasing entirely, while --rebase updates branches")
+	}
+	// --skip-rebase requires --merge
+	if c.SkipRebase && !c.Merge {
+		return fmt.Errorf("--skip-rebase requires --merge; it allows merging PRs without requiring the branch to be up-to-date")
+	}
 	return nil
 }
 
@@ -73,8 +82,9 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	org := fs.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
 	sourceBranch := fs.String("source-branch", "", "Branch name pattern to match pull request head branches")
-	rebase := fs.Bool("rebase", false, "Update out-of-date branches (mutually exclusive with --merge)")
+	rebase := fs.Bool("rebase", false, "Update out-of-date branches (mutually exclusive with --merge and --skip-rebase)")
 	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state (mutually exclusive with --rebase)")
+	skipRebase := fs.Bool("skip-rebase", false, "Skip rebase check and merge PRs that are behind (requires --merge, mutually exclusive with --rebase)")
 	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
 	confirm := fs.Bool("confirm", false, "Scan all repos first, then prompt for confirmation before taking actions")
@@ -101,6 +111,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		SourceBranch: *sourceBranch,
 		Rebase:       *rebase,
 		Merge:        *merge,
+		SkipRebase:   *skipRebase,
 		Repos:        repos,
 		RepoLimit:    *repoLimit,
 		JSON:         *jsonOutput,

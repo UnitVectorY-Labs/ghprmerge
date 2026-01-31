@@ -15,19 +15,20 @@ func TestParseFlags(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name          string
-		args          []string
-		envToken      string
-		envOrg        string
-		wantOrg       string
-		wantBranch    string
-		wantRebase    bool
-		wantMerge     bool
-		wantRepoLimit int
-		wantJSON      bool
-		wantQuiet     bool
-		wantRepos     []string
-		wantErr       bool
+		name           string
+		args           []string
+		envToken       string
+		envOrg         string
+		wantOrg        string
+		wantBranch     string
+		wantRebase     bool
+		wantMerge      bool
+		wantSkipRebase bool
+		wantRepoLimit  int
+		wantJSON       bool
+		wantQuiet      bool
+		wantRepos      []string
+		wantErr        bool
 	}{
 		{
 			name:          "rebase with json and limit",
@@ -94,6 +95,15 @@ func TestParseFlags(t *testing.T) {
 			wantBranch: "dependabot/",
 			wantQuiet:  true,
 		},
+		{
+			name:           "skip-rebase with merge",
+			args:           []string{"--org", "myorg", "--source-branch", "dependabot/", "--skip-rebase", "--merge"},
+			envToken:       "test-token",
+			wantOrg:        "myorg",
+			wantBranch:     "dependabot/",
+			wantMerge:      true,
+			wantSkipRebase: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -120,6 +130,9 @@ func TestParseFlags(t *testing.T) {
 			}
 			if cfg.Merge != tt.wantMerge {
 				t.Errorf("Merge = %v, want %v", cfg.Merge, tt.wantMerge)
+			}
+			if cfg.SkipRebase != tt.wantSkipRebase {
+				t.Errorf("SkipRebase = %v, want %v", cfg.SkipRebase, tt.wantSkipRebase)
 			}
 			if cfg.RepoLimit != tt.wantRepoLimit {
 				t.Errorf("RepoLimit = %v, want %v", cfg.RepoLimit, tt.wantRepoLimit)
@@ -213,6 +226,41 @@ func TestConfigValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "mutually exclusive",
+		},
+		{
+			name: "valid config with skip-rebase and merge",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				SkipRebase:   true,
+				Merge:        true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "skip-rebase and rebase mutually exclusive",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				SkipRebase:   true,
+				Rebase:       true,
+			},
+			wantErr: true,
+			errMsg:  "--skip-rebase and --rebase are mutually exclusive",
+		},
+		{
+			name: "skip-rebase requires merge",
+			config: Config{
+				Org:          "myorg",
+				SourceBranch: "dependabot/",
+				Token:        "test-token",
+				SkipRebase:   true,
+				Merge:        false,
+			},
+			wantErr: true,
+			errMsg:  "--skip-rebase requires --merge",
 		},
 	}
 

@@ -355,6 +355,13 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 
 	// Check if branch is up to date
 	if !branchStatus.UpToDate {
+		// If skip-rebase is enabled with merge, would merge despite being behind
+		if m.config.SkipRebase && m.config.Merge {
+			result.Action = output.ActionWouldMerge
+			result.Reason = fmt.Sprintf("all checks passing, would merge (branch is %d commits behind, rebase skipped)", branchStatus.BehindBy)
+			return result
+		}
+
 		// If rebase is not enabled, skip
 		if !m.config.Rebase {
 			result.Action = output.ActionSkipBranchBehind
@@ -593,6 +600,19 @@ func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh
 		URL:        pr.URL,
 		HeadBranch: pr.HeadBranch,
 		Title:      pr.Title,
+	}
+
+	// If skip-rebase is enabled with merge, proceed to merge despite being behind
+	if m.config.SkipRebase && m.config.Merge {
+		// Perform merge (branch is behind but we're skipping the rebase requirement)
+		if err := m.client.MergePullRequest(ctx, owner, repo.Name, pr.Number); err != nil {
+			result.Action = output.ActionMergeFailed
+			result.Reason = fmt.Sprintf("merge failed: %v", err)
+			return result
+		}
+		result.Action = output.ActionMerged
+		result.Reason = fmt.Sprintf("successfully merged (branch was %d commits behind, rebase skipped)", branchStatus.BehindBy)
+		return result
 	}
 
 	// If rebase is not enabled, skip

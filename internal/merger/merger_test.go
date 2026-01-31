@@ -3,6 +3,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
@@ -641,5 +642,199 @@ func TestMergerRebaseOnly(t *testing.T) {
 	}
 	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
+	}
+}
+
+func TestMergerSkipRebaseWithMerge(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+	// Branch is behind
+	key := fmt.Sprintf("testorg/repo1/%c", rune(1))
+	mock.BranchStatuses[key] = &github.BranchStatus{
+		UpToDate:    false,
+		BehindBy:    3,
+		HasConflict: false,
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       false,
+		Merge:        true,
+		SkipRebase:   true, // Skip rebase and merge anyway
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify merge was done (not rebase)
+	if len(mock.MergeCalls) != 1 {
+		t.Errorf("Expected 1 merge call, got %d", len(mock.MergeCalls))
+	}
+	if len(mock.PostRebaseCalls) != 0 {
+		t.Errorf("Expected 0 rebase calls in skip-rebase mode, got %d", len(mock.PostRebaseCalls))
+	}
+	if len(mock.UpdateBranchCalls) != 0 {
+		t.Errorf("Expected 0 update branch calls in skip-rebase mode, got %d", len(mock.UpdateBranchCalls))
+	}
+
+	// Verify result
+	if result.Summary.MergedSuccess != 1 {
+		t.Errorf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionMerged {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionMerged)
+	}
+
+	// Verify reason mentions branch was behind and rebase was skipped
+	reason := result.Repositories[0].PullRequests[0].Reason
+	if !strings.Contains(reason, "behind") || !strings.Contains(reason, "skipped") {
+		t.Errorf("Reason should mention branch was behind and rebase skipped, got: %s", reason)
+	}
+}
+
+func TestMergerSkipRebaseWithConflict(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+	// Branch has conflict - should still skip even with skip-rebase
+	key := fmt.Sprintf("testorg/repo1/%c", rune(1))
+	mock.BranchStatuses[key] = &github.BranchStatus{
+		UpToDate:    false,
+		BehindBy:    3,
+		HasConflict: true,
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       false,
+		Merge:        true,
+		SkipRebase:   true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify no merge was attempted (conflicts should still block)
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("Expected 0 merge calls when there are conflicts, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify skipped with conflict reason
+	if result.Summary.Skipped != 1 {
+		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipConflict {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipConflict)
+	}
+}
+
+func TestMergerSkipRebaseWithFailingChecks(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		Details:    "check 'CI' has conclusion 'failure'",
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       false,
+		Merge:        true,
+		SkipRebase:   true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify no merge was attempted (failing checks should still block)
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("Expected 0 merge calls when checks are failing, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify skipped
+	if result.Summary.Skipped != 1 {
+		t.Errorf("Skipped = %d, want 1", result.Summary.Skipped)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipChecksFailing {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipChecksFailing)
 	}
 }
