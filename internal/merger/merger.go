@@ -315,8 +315,8 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	}
 
 	// Handle check status
-	// When in rebase-only mode, we don't require passing checks since the point
-	// of rebasing is potentially to fix failing checks
+	// When in rebase-only mode, we don't require passing checks since rebasing
+	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
 
 	if checkStatus.NoChecks {
@@ -550,8 +550,8 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 	}
 
 	// Handle check status
-	// When in rebase-only mode, we don't require passing checks since the point
-	// of rebasing is potentially to fix failing checks
+	// When in rebase-only mode, we don't require passing checks since rebasing
+	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
 
 	if checkStatus.NoChecks {
