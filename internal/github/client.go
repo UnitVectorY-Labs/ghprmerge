@@ -318,14 +318,15 @@ func (c *RealClient) GetBranchStatus(ctx context.Context, owner, repo string, pr
 func (c *RealClient) UpdateBranch(ctx context.Context, owner, repo string, prNumber int) error {
 	_, _, err := c.client.PullRequests.UpdateBranch(ctx, owner, repo, prNumber, nil)
 	if err != nil {
-		// Check if this is a rate limit or specific error
-		if ghErr, ok := err.(*github.ErrorResponse); ok {
-			// HTTP 202 means the update was accepted and scheduled - this is success
+		// Check for specific GitHub API error responses
+		if ghErr, ok := err.(*github.ErrorResponse); ok && ghErr.Response != nil {
+			// HTTP 202 Accepted means the update was successfully scheduled
 			// GitHub will process the update asynchronously via a background job
-			if ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusAccepted {
+			if ghErr.Response.StatusCode == http.StatusAccepted {
 				return nil
 			}
-			if ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
+			// HTTP 422 Unprocessable Entity means the update is not supported
+			if ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
 				return fmt.Errorf("branch update not supported or failed: %w", err)
 			}
 		}
