@@ -317,6 +317,10 @@ func (c *RealClient) UpdateBranch(ctx context.Context, owner, repo string, prNum
 	if err != nil {
 		// Check if this is a rate limit or specific error
 		if ghErr, ok := err.(*github.ErrorResponse); ok {
+			// HTTP 202 means the update was accepted and scheduled - this is success
+			if ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusAccepted {
+				return nil
+			}
 			if ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
 				return fmt.Errorf("branch update not supported or failed: %w", err)
 			}
