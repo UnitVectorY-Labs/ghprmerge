@@ -318,7 +318,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	// When in rebase-only mode, we don't require passing checks since the point
 	// of rebasing is potentially to fix failing checks
 	rebaseOnly := m.config.Rebase && !m.config.Merge
-	
+
 	if checkStatus.NoChecks {
 		result.Action = output.ActionSkipNoChecks
 		result.Reason = "no checks found for this pull request"
@@ -553,7 +553,7 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 	// When in rebase-only mode, we don't require passing checks since the point
 	// of rebasing is potentially to fix failing checks
 	rebaseOnly := m.config.Rebase && !m.config.Merge
-	
+
 	if checkStatus.NoChecks {
 		result.Action = output.ActionSkipNoChecks
 		result.Reason = "no checks found for this pull request"
