@@ -312,12 +312,21 @@ func (c *RealClient) GetBranchStatus(ctx context.Context, owner, repo string, pr
 }
 
 // UpdateBranch updates a pull request branch with the base branch.
+// When GitHub returns HTTP 202 Accepted, it means the branch update has been
+// successfully scheduled as a background job. This is treated as success since
+// the rebase was triggered, even though it completes asynchronously.
 func (c *RealClient) UpdateBranch(ctx context.Context, owner, repo string, prNumber int) error {
 	_, _, err := c.client.PullRequests.UpdateBranch(ctx, owner, repo, prNumber, nil)
 	if err != nil {
-		// Check if this is a rate limit or specific error
-		if ghErr, ok := err.(*github.ErrorResponse); ok {
-			if ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
+		// Check for specific GitHub API error responses
+		if ghErr, ok := err.(*github.ErrorResponse); ok && ghErr.Response != nil {
+			// HTTP 202 Accepted means the update was successfully scheduled
+			// GitHub will process the update asynchronously via a background job
+			if ghErr.Response.StatusCode == http.StatusAccepted {
+				return nil
+			}
+			// HTTP 422 Unprocessable Entity means the update is not supported
+			if ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
 				return fmt.Errorf("branch update not supported or failed: %w", err)
 			}
 		}
