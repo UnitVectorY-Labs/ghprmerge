@@ -838,3 +838,134 @@ func TestMergerSkipRebaseWithFailingChecks(t *testing.T) {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipChecksFailing)
 	}
 }
+
+func TestMergerRebaseWithFailingChecks(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		Details:    "check 'CI' has conclusion 'failure'",
+	}
+	// Branch is behind
+	key := fmt.Sprintf("testorg/repo1/%c", rune(1))
+	mock.BranchStatuses[key] = &github.BranchStatus{
+		UpToDate:    false,
+		BehindBy:    3,
+		HasConflict: false,
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       true,
+		Merge:        false, // Rebase only, no merge
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify rebase was done despite failing checks
+	if len(mock.PostRebaseCalls) != 1 {
+		t.Errorf("Expected 1 rebase call, got %d", len(mock.PostRebaseCalls))
+	}
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("Expected 0 merge calls in rebase-only mode, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify result
+	if result.Summary.RebasedSuccess != 1 {
+		t.Errorf("RebasedSuccess = %d, want 1", result.Summary.RebasedSuccess)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
+	}
+}
+
+func TestMergerRebaseWithPendingChecks(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		Pending:    true,
+		Details:    "check 'CI' is pending",
+	}
+	// Branch is behind
+	key := fmt.Sprintf("testorg/repo1/%c", rune(1))
+	mock.BranchStatuses[key] = &github.BranchStatus{
+		UpToDate:    false,
+		BehindBy:    2,
+		HasConflict: false,
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Rebase:       true,
+		Merge:        false, // Rebase only, no merge
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify rebase was done despite pending checks
+	if len(mock.PostRebaseCalls) != 1 {
+		t.Errorf("Expected 1 rebase call, got %d", len(mock.PostRebaseCalls))
+	}
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("Expected 0 merge calls in rebase-only mode, got %d", len(mock.MergeCalls))
+	}
+
+	// Verify result
+	if result.Summary.RebasedSuccess != 1 {
+		t.Errorf("RebasedSuccess = %d, want 1", result.Summary.RebasedSuccess)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
+		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
+	}
+}

@@ -315,6 +315,10 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	}
 
 	// Handle check status
+	// When in rebase-only mode, we don't require passing checks since rebasing
+	// may resolve issues by incorporating upstream changes
+	rebaseOnly := m.config.Rebase && !m.config.Merge
+
 	if checkStatus.NoChecks {
 		result.Action = output.ActionSkipNoChecks
 		result.Reason = "no checks found for this pull request"
@@ -322,14 +326,14 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		return result
 	}
 
-	if checkStatus.Pending {
+	if checkStatus.Pending && !rebaseOnly {
 		result.Action = output.ActionSkipChecksPending
 		result.Reason = checkStatus.Details
 		result.SkipReason = output.ReasonChecksPending
 		return result
 	}
 
-	if !checkStatus.AllPassing {
+	if !checkStatus.AllPassing && !rebaseOnly {
 		result.Action = output.ActionSkipChecksFailing
 		result.Reason = checkStatus.Details
 		result.SkipReason = output.ReasonChecksFailing
@@ -546,6 +550,10 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 	}
 
 	// Handle check status
+	// When in rebase-only mode, we don't require passing checks since rebasing
+	// may resolve issues by incorporating upstream changes
+	rebaseOnly := m.config.Rebase && !m.config.Merge
+
 	if checkStatus.NoChecks {
 		result.Action = output.ActionSkipNoChecks
 		result.Reason = "no checks found for this pull request"
@@ -553,14 +561,14 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 		return result
 	}
 
-	if checkStatus.Pending {
+	if checkStatus.Pending && !rebaseOnly {
 		result.Action = output.ActionSkipChecksPending
 		result.Reason = checkStatus.Details
 		result.SkipReason = output.ReasonChecksPending
 		return result
 	}
 
-	if !checkStatus.AllPassing {
+	if !checkStatus.AllPassing && !rebaseOnly {
 		result.Action = output.ActionSkipChecksFailing
 		result.Reason = checkStatus.Details
 		result.SkipReason = output.ReasonChecksFailing

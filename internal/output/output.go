@@ -100,18 +100,18 @@ type RunMetadata struct {
 
 // RunSummary contains summary statistics for the run.
 type RunSummary struct {
-	ReposProcessed    int            `json:"repos_processed"`
-	ReposSkipped      int            `json:"repos_skipped"`
-	CandidatesFound   int            `json:"candidates_found"`
-	MergedSuccess     int            `json:"merged_success"`
-	MergeFailed       int            `json:"merge_failed"`
-	RebasedSuccess    int            `json:"rebased_success"`
-	RebaseFailed      int            `json:"rebase_failed"`
-	WouldMerge        int            `json:"would_merge,omitempty"`
-	WouldRebase       int            `json:"would_rebase,omitempty"`
-	ReadyToMerge      int            `json:"ready_to_merge,omitempty"`
-	Skipped           int            `json:"skipped"`
-	SkippedByReason   map[string]int `json:"skipped_by_reason,omitempty"`
+	ReposProcessed  int            `json:"repos_processed"`
+	ReposSkipped    int            `json:"repos_skipped"`
+	CandidatesFound int            `json:"candidates_found"`
+	MergedSuccess   int            `json:"merged_success"`
+	MergeFailed     int            `json:"merge_failed"`
+	RebasedSuccess  int            `json:"rebased_success"`
+	RebaseFailed    int            `json:"rebase_failed"`
+	WouldMerge      int            `json:"would_merge,omitempty"`
+	WouldRebase     int            `json:"would_rebase,omitempty"`
+	ReadyToMerge    int            `json:"ready_to_merge,omitempty"`
+	Skipped         int            `json:"skipped"`
+	SkippedByReason map[string]int `json:"skipped_by_reason,omitempty"`
 }
 
 // Writer handles output formatting.
