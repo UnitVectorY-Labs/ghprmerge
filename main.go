@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
@@ -18,6 +19,15 @@ import (
 var Version = "dev"
 
 func main() {
+	// Set the build version from the build info if not set by the build system
+	if Version == "dev" || Version == "" {
+		if bi, ok := debug.ReadBuildInfo(); ok {
+			if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+				Version = bi.Main.Version
+			}
+		}
+	}
+
 	if err := run(); err != nil {
 		// Don't print error for help request
 		if errors.Is(err, config.ErrHelp) {
