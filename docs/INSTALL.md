@@ -46,10 +46,6 @@ Download `ghprmerge_windows_amd64.exe` from the releases page and add it to your
 
 ## Building from Source
 
-### Requirements
-
-- Go 1.21 or later
-
 ### Build
 
 ```bash
