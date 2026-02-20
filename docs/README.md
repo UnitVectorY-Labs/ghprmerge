@@ -1,4 +1,11 @@
-# ghprmerge Documentation
+---
+layout: default
+title: ghprmerge
+nav_order: 1
+permalink: /
+---
+
+# ghprmerge
 
 ## Purpose
 
