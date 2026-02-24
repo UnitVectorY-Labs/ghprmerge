@@ -116,6 +116,10 @@ func (c *RealClient) ListRepositories(ctx context.Context, org string) ([]Reposi
 		}
 
 		for _, repo := range repos {
+			// Skip archived repositories. They cannot be modified.
+			if repo.GetArchived() {
+				continue
+			}
 			allRepos = append(allRepos, Repository{
 				Name:          repo.GetName(),
 				FullName:      repo.GetFullName(),

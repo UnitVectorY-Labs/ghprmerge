@@ -138,6 +138,10 @@ Repositories are processed **one at a time**. The tool:
 - Logs progress for each repository as it's processed
 - Prints results for each repo immediately after processing
 
+## Archived Repository Handling
+
+Archived repositories are automatically excluded during repository discovery and are never processed. Since archived repositories cannot be modified, they are filtered out during discovery.
+
 ## Skip Reasons
 
 When a PR is skipped, one of these reasons is shown:
