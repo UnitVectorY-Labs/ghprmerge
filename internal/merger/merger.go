@@ -445,11 +445,6 @@ func (m *Merger) discoverRepositories(ctx context.Context) ([]gh.Repository, err
 	// Filter repositories
 	var repos []gh.Repository
 	for _, repo := range allRepos {
-		// Skip archived repositories
-		if repo.Archived {
-			continue
-		}
-
 		// If specific repos are specified, filter by them
 		if len(m.config.Repos) > 0 {
 			found := false

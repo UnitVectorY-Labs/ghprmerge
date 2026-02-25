@@ -40,7 +40,7 @@ scan → evaluate → optional rebase → optional merge → report
 
 For each repository (processed sequentially):
 
-1. Fetch repository metadata including default branch
+1. Fetch repository metadata including default branch (archived repositories are skipped)
 2. Enumerate candidate PRs matching `--source-branch` pattern
 3. For each candidate PR:
    - Evaluate readiness (checks, conflicts, branch status)

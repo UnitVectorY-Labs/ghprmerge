@@ -42,12 +42,18 @@ func NewMockClient() *MockClient {
 	}
 }
 
-// ListRepositories returns mock repositories.
+// ListRepositories returns mock repositories, excluding archived ones.
 func (m *MockClient) ListRepositories(ctx context.Context, org string) ([]Repository, error) {
 	if m.ListReposErr != nil {
 		return nil, m.ListReposErr
 	}
-	return m.Repositories, nil
+	var repos []Repository
+	for _, repo := range m.Repositories {
+		if !repo.Archived {
+			repos = append(repos, repo)
+		}
+	}
+	return repos, nil
 }
 
 // ListPullRequests returns mock pull requests.
