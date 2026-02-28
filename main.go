@@ -111,6 +111,7 @@ func hasActionsToPerform(result *output.RunResult) bool {
 }
 
 // countPendingLines counts the number of terminal lines used for pending action display.
+// This must stay in sync with PrintPendingAction's output format (2 lines per action).
 func countPendingLines(result *output.RunResult) int {
 	lines := 0
 	for _, repo := range result.Repositories {
