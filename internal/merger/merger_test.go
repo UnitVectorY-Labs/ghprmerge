@@ -1,6 +1,7 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -187,6 +188,114 @@ func TestMergerSkipsFailingChecks(t *testing.T) {
 
 	if result.Repositories[0].PullRequests[0].Action != output.ActionSkipChecksFailing {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionSkipChecksFailing)
+	}
+}
+
+func TestMergerAllowsMergeWhenNoChecksExist(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		NoChecks:   true,
+		Details:    "no checks found",
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(mock.MergeCalls) != 1 {
+		t.Fatalf("Expected 1 merge call when no checks exist, got %d", len(mock.MergeCalls))
+	}
+	if result.Summary.MergedSuccess != 1 {
+		t.Fatalf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionMerged {
+		t.Fatalf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionMerged)
+	}
+	if !strings.Contains(result.Repositories[0].PullRequests[0].Reason, "no checks configured") {
+		t.Fatalf("expected merge reason to mention missing checks, got %q", result.Repositories[0].PullRequests[0].Reason)
+	}
+}
+
+func TestMergerConfirmTreatsNoChecksAsPendingMerge(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		NoChecks:   true,
+		Details:    "no checks found",
+	}
+
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+		Confirm:      true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if result.Summary.WouldMerge != 1 {
+		t.Fatalf("WouldMerge = %d, want 1", result.Summary.WouldMerge)
+	}
+	if result.Repositories[0].PullRequests[0].Action != output.ActionWouldMerge {
+		t.Fatalf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionWouldMerge)
+	}
+	if !strings.Contains(result.Repositories[0].PullRequests[0].Reason, "no checks configured") {
+		t.Fatalf("expected pending merge reason to mention missing checks, got %q", result.Repositories[0].PullRequests[0].Reason)
 	}
 }
 
@@ -642,6 +751,229 @@ func TestMergerRebaseOnly(t *testing.T) {
 	}
 	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
+	}
+}
+
+func TestMergerConfirmDefaultDoesNotPrintRepoResultsDuringScan(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+		{
+			Name:          "repo2",
+			FullName:      "testorg/repo2",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+		Confirm:      true,
+	}
+
+	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	if _, err := m.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	out := buf.String()
+	if strings.Contains(out, "testorg/repo1") {
+		t.Fatalf("expected confirm scan to avoid repo result output, got:\n%s", out)
+	}
+	if strings.Contains(out, "testorg/repo2") {
+		t.Fatalf("expected confirm scan to avoid repo result output, got:\n%s", out)
+	}
+}
+
+func TestMergerVerboseStreamsRepoOutcomesDuringScan(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+		{
+			Name:          "repo2",
+			FullName:      "testorg/repo2",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo2"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo2/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo2",
+		},
+	}
+	mock.CheckStatuses["testorg/repo2/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Verbose:      true,
+	}
+
+	m := New(mock, cfg, output.NewConsole(&buf, true, true))
+	if _, err := m.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "testorg/repo1 ─ no matching pull requests") {
+		t.Fatalf("expected verbose scan output for repo without matching PRs, got:\n%s", out)
+	}
+	if !strings.Contains(out, "testorg/repo2 #1 Bump lodash") {
+		t.Fatalf("expected verbose scan output for matching PR, got:\n%s", out)
+	}
+	if strings.Count(out, "testorg/repo2 #1 Bump lodash") != 1 {
+		t.Fatalf("expected live verbose output without duplicate repo results, got:\n%s", out)
+	}
+}
+
+func TestMergerRunWithActionsVerbosePrintsCompletedActions(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+		{
+			Name:          "repo2",
+			FullName:      "testorg/repo2",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+		Confirm:      true,
+		Verbose:      true,
+	}
+
+	m := New(mock, cfg, output.NewConsole(&buf, true, true))
+	scanResult, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	buf.Reset()
+	result, err := m.RunWithActions(context.Background(), scanResult)
+	if err != nil {
+		t.Fatalf("RunWithActions() error = %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "merged") {
+		t.Fatalf("expected execution output to show completed action, got:\n%s", out)
+	}
+	if strings.Contains(out, "would merge") {
+		t.Fatalf("expected execution output to replace pending action text, got:\n%s", out)
+	}
+	if strings.Contains(out, "testorg/repo2") {
+		t.Fatalf("expected verbose execution output to omit repos without completed actions, got:\n%s", out)
+	}
+	if result.Summary.MergedSuccess != 1 {
+		t.Fatalf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+}
+
+func TestMergerConfirmWithoutPendingActionsPrintsRepoResults(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: false,
+		Details:    "check 'CI' has conclusion 'failure'",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+		Confirm:      true,
+	}
+
+	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "testorg/repo1 #1 Bump lodash") {
+		t.Fatalf("expected confirm mode without pending actions to print repo result, got:\n%s", out)
+	}
+	if !strings.Contains(out, "skip: checks failing") {
+		t.Fatalf("expected confirm mode without pending actions to include skip reason, got:\n%s", out)
+	}
+	if result.Summary.Skipped != 1 {
+		t.Fatalf("Skipped = %d, want 1", result.Summary.Skipped)
 	}
 }
 

@@ -3,9 +3,7 @@ package output
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"strings"
 	"time"
 )
 
@@ -116,17 +114,17 @@ type RunSummary struct {
 
 // Writer handles output formatting.
 type Writer struct {
-	out       io.Writer
-	jsonMode  bool
-	quietMode bool
+	out      io.Writer
+	jsonMode bool
+	noColor  bool
 }
 
 // NewWriter creates a new Writer.
-func NewWriter(out io.Writer, jsonMode bool, quietMode bool) *Writer {
+func NewWriter(out io.Writer, jsonMode bool, noColor bool) *Writer {
 	return &Writer{
-		out:       out,
-		jsonMode:  jsonMode,
-		quietMode: quietMode,
+		out:      out,
+		jsonMode: jsonMode,
+		noColor:  noColor,
 	}
 }
 
@@ -145,120 +143,9 @@ func (w *Writer) writeJSON(result *RunResult) error {
 	return encoder.Encode(result)
 }
 
-// writeHuman writes the result in human-readable format.
+// writeHuman writes the result in human-readable format as a condensed summary.
 func (w *Writer) writeHuman(result *RunResult) error {
-	// Print header
-	fmt.Fprintf(w.out, "╔══════════════════════════════════════════════════════════════════════════════╗\n")
-	fmt.Fprintf(w.out, "║  ghprmerge - %s\n", result.Metadata.Org)
-	fmt.Fprintf(w.out, "╚══════════════════════════════════════════════════════════════════════════════╝\n")
-	fmt.Fprintf(w.out, "\n")
-	fmt.Fprintf(w.out, "  Source branch: %s\n", result.Metadata.SourceBranch)
-	fmt.Fprintf(w.out, "  Mode:          %s\n", result.Metadata.Mode)
-	if result.Metadata.RepoLimitDesc != "" {
-		fmt.Fprintf(w.out, "  Limit:         %s\n", result.Metadata.RepoLimitDesc)
-	}
-	fmt.Fprintf(w.out, "\n")
-
-	// Print each repository
-	for _, repo := range result.Repositories {
-		// In quiet mode, skip repos with no matching PRs and no skip reason
-		if w.quietMode && !repo.Skipped && len(repo.PullRequests) == 0 {
-			continue
-		}
-
-		fmt.Fprintf(w.out, "┌─ %s (default: %s)\n", repo.FullName, repo.DefaultBranch)
-
-		if repo.Skipped {
-			fmt.Fprintf(w.out, "│  ⊘ Repository skipped: %s\n", repo.SkipReason)
-			fmt.Fprintf(w.out, "└────────────────────────────────────────────────────────────────────────────────\n\n")
-			continue
-		}
-
-		if len(repo.PullRequests) == 0 {
-			fmt.Fprintf(w.out, "│  No matching pull requests\n")
-		} else {
-			for _, pr := range repo.PullRequests {
-				symbol := w.getActionSymbol(pr.Action)
-				fmt.Fprintf(w.out, "│  %s PR #%-5d  %-40s\n", symbol, pr.Number, truncateString(pr.Title, 40))
-				fmt.Fprintf(w.out, "│              Branch: %s\n", pr.HeadBranch)
-				fmt.Fprintf(w.out, "│              Action: %s\n", pr.Action)
-				if pr.Reason != "" {
-					fmt.Fprintf(w.out, "│              Detail: %s\n", pr.Reason)
-				}
-			}
-		}
-		fmt.Fprintf(w.out, "└────────────────────────────────────────────────────────────────────────────────\n\n")
-	}
-
-	// Print summary
-	fmt.Fprintf(w.out, "═══════════════════════════════════════════════════════════════════════════════\n")
-	fmt.Fprintf(w.out, "                                    SUMMARY\n")
-	fmt.Fprintf(w.out, "═══════════════════════════════════════════════════════════════════════════════\n")
-	fmt.Fprintf(w.out, "  Repositories processed:  %d\n", result.Summary.ReposProcessed)
-	fmt.Fprintf(w.out, "  Repositories skipped:    %d\n", result.Summary.ReposSkipped)
-	fmt.Fprintf(w.out, "  Candidates found:        %d\n", result.Summary.CandidatesFound)
-	fmt.Fprintf(w.out, "\n")
-
-	// Show analysis mode results
-	if result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0 {
-		fmt.Fprintf(w.out, "  Would merge:             %d\n", result.Summary.WouldMerge)
-		fmt.Fprintf(w.out, "  Would rebase:            %d\n", result.Summary.WouldRebase)
-	}
-
-	// Show ready to merge (when merge not enabled)
-	if result.Summary.ReadyToMerge > 0 {
-		fmt.Fprintf(w.out, "  Ready to merge:          %d\n", result.Summary.ReadyToMerge)
-	}
-
-	// Show execution mode results
-	if result.Summary.MergedSuccess > 0 || result.Summary.MergeFailed > 0 {
-		fmt.Fprintf(w.out, "  Merged successfully:     %d\n", result.Summary.MergedSuccess)
-		fmt.Fprintf(w.out, "  Merge failed:            %d\n", result.Summary.MergeFailed)
-	}
-	if result.Summary.RebasedSuccess > 0 || result.Summary.RebaseFailed > 0 {
-		fmt.Fprintf(w.out, "  Rebased successfully:    %d\n", result.Summary.RebasedSuccess)
-		fmt.Fprintf(w.out, "  Rebase failed:           %d\n", result.Summary.RebaseFailed)
-	}
-
-	fmt.Fprintf(w.out, "  Skipped:                 %d\n", result.Summary.Skipped)
-
-	// Show skipped by reason
-	if len(result.Summary.SkippedByReason) > 0 {
-		fmt.Fprintf(w.out, "\n  Skipped by reason:\n")
-		for reason, count := range result.Summary.SkippedByReason {
-			fmt.Fprintf(w.out, "    %-30s %d\n", reason, count)
-		}
-	}
-
-	fmt.Fprintf(w.out, "═══════════════════════════════════════════════════════════════════════════════\n")
-
+	c := NewConsole(w.out, w.noColor, false)
+	c.PrintSummary(result.Summary)
 	return nil
-}
-
-// getActionSymbol returns a symbol for the action type.
-func (w *Writer) getActionSymbol(action Action) string {
-	switch action {
-	case ActionMerged, ActionWouldMerge, ActionReadyMerge:
-		return "✓"
-	case ActionRebased, ActionWouldRebase:
-		return "↻"
-	case ActionMergeFailed, ActionRebaseFailed:
-		return "✗"
-	default:
-		if strings.HasPrefix(string(action), "skip:") {
-			return "⊘"
-		}
-		return "•"
-	}
-}
-
-// truncateString truncates a string to maxLen and adds "..." if needed.
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
 }

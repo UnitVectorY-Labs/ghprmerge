@@ -57,8 +57,14 @@ func run() error {
 	// Create GitHub client
 	client := github.NewRealClient(cfg.Token)
 
-	// Create merger with progress logging
-	m := merger.New(client, cfg, os.Stderr)
+	// Create console for terminal output (nil if JSON mode)
+	var console *output.Console
+	if !cfg.JSON {
+		console = output.NewConsole(os.Stderr, cfg.NoColor, cfg.Verbose)
+	}
+
+	// Create merger with console
+	m := merger.New(client, cfg, console)
 
 	// Run merger
 	ctx := context.Background()
@@ -69,10 +75,25 @@ func run() error {
 
 	// If confirm mode is enabled and there are actions to take, prompt user
 	if cfg.Confirm && hasActionsToPerform(result) {
-		if !promptConfirmation(result) {
-			fmt.Fprintln(os.Stderr, "Operation cancelled by user.")
+		showPending := !cfg.Verbose
+		proceed, promptLines := promptConfirmation(console, result, showPending)
+		if !proceed {
+			if console != nil {
+				fmt.Fprintln(os.Stderr, console.Dim("Operation cancelled by user."))
+			} else {
+				fmt.Fprintln(os.Stderr, "Operation cancelled by user.")
+			}
 			return nil
 		}
+
+		if console != nil {
+			linesToClear := promptLines
+			if cfg.Verbose {
+				linesToClear += m.ScanDisplayLines()
+			}
+			console.ClearLines(linesToClear)
+		}
+
 		// Re-run with actions enabled
 		result, err = m.RunWithActions(ctx, result)
 		if err != nil {
@@ -80,8 +101,8 @@ func run() error {
 		}
 	}
 
-	// Output results
-	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.Quiet)
+	// Output results (condensed summary for human mode, full JSON for JSON mode)
+	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.NoColor)
 	return writer.WriteResult(result)
 }
 
@@ -90,29 +111,47 @@ func hasActionsToPerform(result *output.RunResult) bool {
 	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
 }
 
-// promptConfirmation displays a summary of planned actions and prompts for confirmation.
-func promptConfirmation(result *output.RunResult) bool {
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════════════")
-	fmt.Fprintln(os.Stderr, "                           CONFIRMATION REQUIRED")
-	fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════════════")
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintf(os.Stderr, "  Actions to be performed:\n")
-	if result.Summary.WouldMerge > 0 {
-		fmt.Fprintf(os.Stderr, "    • Merge %d pull request(s)\n", result.Summary.WouldMerge)
+// promptConfirmation displays pending actions and prompts for confirmation.
+// It returns whether to proceed and the number of visible terminal lines written.
+func promptConfirmation(console *output.Console, result *output.RunResult, showPending bool) (bool, int) {
+	lines := 0
+
+	if showPending && console != nil {
+		fmt.Fprintln(os.Stderr, console.Bold("Pending actions:"))
+		lines++
+		for _, repo := range result.Repositories {
+			for _, pr := range repo.PullRequests {
+				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
+					lines += console.PrintPendingAction(repo, pr)
+				}
+			}
+		}
+	} else if showPending {
+		fmt.Fprintln(os.Stderr, "Pending actions:")
+		lines++
+		for _, repo := range result.Repositories {
+			for _, pr := range repo.PullRequests {
+				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
+					fmt.Fprintf(os.Stderr, "  %s #%d %s ─ %s\n", repo.FullName, pr.Number, pr.Title, pr.Action)
+					lines++
+				}
+			}
+		}
 	}
-	if result.Summary.WouldRebase > 0 {
-		fmt.Fprintf(os.Stderr, "    • Rebase/update %d pull request(s)\n", result.Summary.WouldRebase)
+
+	if showPending {
+		fmt.Fprintln(os.Stderr)
+		lines++
 	}
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprint(os.Stderr, "  Do you want to proceed? [y/N]: ")
+	fmt.Fprint(os.Stderr, "Do you want to proceed? [y/N]: ")
+	lines++
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return false
+		return false, lines
 	}
 
 	input = strings.TrimSpace(strings.ToLower(input))
-	return input == "y" || input == "yes"
+	return input == "y" || input == "yes", lines
 }
