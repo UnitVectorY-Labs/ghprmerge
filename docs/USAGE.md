@@ -26,7 +26,9 @@ ghprmerge [flags]
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
 | `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
-| `--quiet` | `false` | No | Reduce output by suppressing repos with no matching pull requests |
+| `--quiet` | `false` | No | Suppress repos with no matching pull requests (now the default, kept for compatibility) |
+| `--verbose` | `false` | No | Show all repositories including those with no matching pull requests |
+| `--no-color` | `false` | No | Disable colored output |
 | `--version` | - | No | Show version information and exit |
 
 ## Environment Variables
@@ -89,10 +91,29 @@ ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ```
 
-- Scans all repositories first
-- Displays summary of planned actions
+- Scans all repositories first with a progress bar
+- Displays a list of pending actions (PRs that would be rebased or merged)
 - Prompts for user confirmation before executing
+- On confirmation, clears the pending list and shows execution progress with results
 - Useful for reviewing changes before taking action
+
+### Verbose Output
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --verbose
+```
+
+- Shows all repositories, including those with no matching pull requests
+- By default, only repositories with matching PRs are displayed
+
+### Disable Colors
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --no-color
+```
+
+- Disables ANSI color codes in terminal output
+- Useful for piping output to files or running in CI environments
 
 ## Version Information
 
@@ -135,8 +156,8 @@ Repositories are processed **one at a time**. The tool:
 
 - Never loads all org data before performing mutations
 - Never operates on multiple repos in parallel
-- Logs progress for each repository as it's processed
-- Prints results for each repo immediately after processing
+- Shows a progress bar as repositories are scanned
+- Prints results for repos with matching PRs after the scan completes
 
 ## Archived Repository Handling
 
@@ -164,26 +185,31 @@ When a PR is skipped, one of these reasons is shown:
 
 ### Human-Readable (Default)
 
-Clear sections per repository with consistent status symbols:
+Output uses colored text and Unicode symbols for clear, scannable results:
 
-- `✓` merged / would merge
-- `↻` rebased / would rebase  
-- `✗` failed
-- `⊘` skipped
+- `✓` merged / would merge (green)
+- `↻` rebased / would rebase (yellow)
+- `✗` failed (red)
+- `⊘` skipped (dim)
 
-Progress is logged to stderr as repositories are scanned:
+A progress bar is shown during scanning:
 ```
-Starting ghprmerge for organization: myorg
-Source branch pattern: dependabot/
-Mode: analysis only (no mutations)
-Discovering repositories...
-Found 5 repositories to process
-[1/5] Scanning repository: myorg/repo1
-  └─ Found 2 matching pull request(s)
-[2/5] Scanning repository: myorg/repo2
-  └─ No matching pull requests
-...
+Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
 ```
+
+After scanning, only repositories with matching PRs are shown (use `--verbose` to see all repositories). Each matching PR is displayed with its action and details:
+```
+  ✓ myorg/repo1 #42 Bump lodash to 4.17.21
+    would merge ─ all checks passing, branch up to date
+```
+
+A condensed summary line is printed at the end:
+```
+────────────────────────────────────────────────────
+100 repos scanned │ 3 PRs found │ 1 merged │ 1 rebased │ 1 skipped
+```
+
+Use `--no-color` to disable ANSI color codes (useful for piping output or CI environments).
 
 ### JSON Mode
 

@@ -48,7 +48,8 @@ For each repository (processed sequentially):
    - If `--merge` and PR is valid: attempt merge
    - If `--merge --skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
-4. Print per-repository summary
+4. Show progress bar during scanning, then print results for repos with matching PRs
+5. Print condensed summary
 
 ## Contents
 

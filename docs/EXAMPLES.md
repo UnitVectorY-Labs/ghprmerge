@@ -65,7 +65,25 @@ Scan all repositories first, then prompt before taking actions:
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ```
 
-This is useful when you want to review the planned actions before execution.
+This is useful when you want to review the planned actions before execution. Pending actions are listed, and on confirmation, execution progress is shown with a progress bar.
+
+## Verbose Output
+
+Show all repositories, including those with no matching pull requests:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --verbose
+```
+
+By default, only repositories with matching PRs are displayed in the output.
+
+## Disable Colored Output
+
+Disable ANSI color codes for piping or CI:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --no-color
+```
 
 ## Scoped Repository Run
 

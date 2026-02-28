@@ -29,6 +29,12 @@ ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
 
 # Use --confirm to review before taking actions
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
+
+# Show all repos (including those with no matching PRs)
+ghprmerge --org myorg --source-branch dependabot/ --verbose
+
+# Disable colored output
+ghprmerge --org myorg --source-branch dependabot/ --no-color
 ```
 
 ## Documentation
