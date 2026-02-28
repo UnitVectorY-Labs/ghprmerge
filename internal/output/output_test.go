@@ -10,7 +10,7 @@ import (
 
 func TestWriterHumanOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, false)
+	writer := NewWriter(&buf, false, false, true) // noColor=true for predictable output
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -53,14 +53,11 @@ func TestWriterHumanOutput(t *testing.T) {
 
 	output := buf.String()
 
-	// Check for key elements in output
+	// Check for key summary elements
 	checks := []string{
-		"test-org",
-		"dependabot/",
-		"test-org/repo1",
-		"main",
-		"#1",
-		"would merge",
+		"1 repos scanned",
+		"1 PRs found",
+		"1 would merge",
 	}
 
 	for _, check := range checks {
@@ -72,7 +69,7 @@ func TestWriterHumanOutput(t *testing.T) {
 
 func TestWriterJSONOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, true, false)
+	writer := NewWriter(&buf, true, false, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -157,33 +154,28 @@ func TestActionConstants(t *testing.T) {
 	}
 }
 
-func TestWriterQuietModeHidesEmptyRepos(t *testing.T) {
+func TestWriterSummaryShowsCorrectCounts(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, true) // quiet mode enabled
+	writer := NewWriter(&buf, false, false, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
 			Org:          "test-org",
 			SourceBranch: "dependabot/",
-			Mode:         "analysis only (no mutations)",
+			Mode:         "merge mode",
 		},
 		Repositories: []RepositoryResult{
 			{
-				Name:          "repo-with-pr",
-				FullName:      "test-org/repo-with-pr",
+				Name:          "repo1",
+				FullName:      "test-org/repo1",
 				DefaultBranch: "main",
 				PullRequests: []PullRequestResult{
-					{
-						Number:     1,
-						HeadBranch: "dependabot/npm/lodash",
-						Title:      "Bump lodash",
-						Action:     ActionWouldMerge,
-					},
+					{Number: 1, Action: ActionMerged},
 				},
 			},
 			{
-				Name:          "repo-without-pr",
-				FullName:      "test-org/repo-without-pr",
+				Name:          "repo2",
+				FullName:      "test-org/repo2",
 				DefaultBranch: "main",
 				PullRequests:  []PullRequestResult{},
 			},
@@ -191,6 +183,8 @@ func TestWriterQuietModeHidesEmptyRepos(t *testing.T) {
 		Summary: RunSummary{
 			ReposProcessed:  2,
 			CandidatesFound: 1,
+			MergedSuccess:   1,
+			Skipped:         0,
 		},
 	}
 
@@ -201,42 +195,29 @@ func TestWriterQuietModeHidesEmptyRepos(t *testing.T) {
 
 	output := buf.String()
 
-	// Repo with PR should be shown
-	if !strings.Contains(output, "repo-with-pr") {
-		t.Error("Expected repo-with-pr to be in output")
+	if !strings.Contains(output, "2 repos scanned") {
+		t.Errorf("Expected '2 repos scanned' in output:\n%s", output)
 	}
-
-	// Repo without PR should NOT be shown in quiet mode
-	if strings.Contains(output, "repo-without-pr") {
-		t.Error("Expected repo-without-pr to NOT be in output in quiet mode")
+	if !strings.Contains(output, "1 PRs found") {
+		t.Errorf("Expected '1 PRs found' in output:\n%s", output)
 	}
-
-	// "No matching pull requests" should NOT be in output
-	if strings.Contains(output, "No matching pull requests") {
-		t.Error("Expected 'No matching pull requests' to NOT be in output in quiet mode")
+	if !strings.Contains(output, "1 merged") {
+		t.Errorf("Expected '1 merged' in output:\n%s", output)
 	}
 }
 
-func TestWriterNonQuietModeShowsEmptyRepos(t *testing.T) {
+func TestWriterSummaryHidesZeroCounts(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, false) // quiet mode disabled
+	writer := NewWriter(&buf, false, false, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
 			Org:          "test-org",
 			SourceBranch: "dependabot/",
-			Mode:         "analysis only (no mutations)",
-		},
-		Repositories: []RepositoryResult{
-			{
-				Name:          "repo-without-pr",
-				FullName:      "test-org/repo-without-pr",
-				DefaultBranch: "main",
-				PullRequests:  []PullRequestResult{},
-			},
+			Mode:         "analysis only",
 		},
 		Summary: RunSummary{
-			ReposProcessed:  1,
+			ReposProcessed:  5,
 			CandidatesFound: 0,
 		},
 	}
@@ -248,13 +229,19 @@ func TestWriterNonQuietModeShowsEmptyRepos(t *testing.T) {
 
 	output := buf.String()
 
-	// Repo should be shown
-	if !strings.Contains(output, "repo-without-pr") {
-		t.Error("Expected repo-without-pr to be in output")
+	// Should show repos scanned and PRs found
+	if !strings.Contains(output, "5 repos scanned") {
+		t.Errorf("Expected '5 repos scanned' in output:\n%s", output)
+	}
+	if !strings.Contains(output, "0 PRs found") {
+		t.Errorf("Expected '0 PRs found' in output:\n%s", output)
 	}
 
-	// "No matching pull requests" SHOULD be in output
-	if !strings.Contains(output, "No matching pull requests") {
-		t.Error("Expected 'No matching pull requests' to be in output")
+	// Should NOT show merge/rebase counts when zero
+	if strings.Contains(output, "merged") {
+		t.Errorf("Expected no merge count when zero:\n%s", output)
+	}
+	if strings.Contains(output, "rebased") {
+		t.Errorf("Expected no rebase count when zero:\n%s", output)
 	}
 }

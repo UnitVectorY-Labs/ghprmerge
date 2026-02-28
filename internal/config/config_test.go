@@ -27,6 +27,8 @@ func TestParseFlags(t *testing.T) {
 		wantRepoLimit  int
 		wantJSON       bool
 		wantQuiet      bool
+		wantVerbose    bool
+		wantNoColor    bool
 		wantRepos      []string
 		wantErr        bool
 	}{
@@ -104,6 +106,22 @@ func TestParseFlags(t *testing.T) {
 			wantMerge:      true,
 			wantSkipRebase: true,
 		},
+		{
+			name:        "verbose mode",
+			args:        []string{"--org", "myorg", "--source-branch", "dependabot/", "--verbose"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantVerbose: true,
+		},
+		{
+			name:        "no-color mode",
+			args:        []string{"--org", "myorg", "--source-branch", "dependabot/", "--no-color"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantNoColor: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -142,6 +160,12 @@ func TestParseFlags(t *testing.T) {
 			}
 			if cfg.Quiet != tt.wantQuiet {
 				t.Errorf("Quiet = %v, want %v", cfg.Quiet, tt.wantQuiet)
+			}
+			if cfg.Verbose != tt.wantVerbose {
+				t.Errorf("Verbose = %v, want %v", cfg.Verbose, tt.wantVerbose)
+			}
+			if cfg.NoColor != tt.wantNoColor {
+				t.Errorf("NoColor = %v, want %v", cfg.NoColor, tt.wantNoColor)
 			}
 			if len(tt.wantRepos) > 0 {
 				if len(cfg.Repos) != len(tt.wantRepos) {

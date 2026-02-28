@@ -34,6 +34,8 @@ type Config struct {
 	JSON         bool
 	Confirm      bool
 	Quiet        bool
+	Verbose      bool
+	NoColor      bool
 	Token        string
 }
 
@@ -88,7 +90,9 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
 	confirm := fs.Bool("confirm", false, "Scan all repos first, then prompt for confirmation before taking actions")
-	quiet := fs.Bool("quiet", false, "Reduce output by suppressing repos with no matching pull requests")
+	quiet := fs.Bool("quiet", false, "Reduce output by suppressing repos with no matching pull requests (default behavior)")
+	verbose := fs.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
+	noColor := fs.Bool("no-color", false, "Disable colored output")
 	showVersion := fs.Bool("version", false, "Show version information and exit")
 
 	fs.Var(&repos, "repo", "Limit execution to specific repositories (may be repeated)")
@@ -117,6 +121,8 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		JSON:         *jsonOutput,
 		Confirm:      *confirm,
 		Quiet:        *quiet,
+		Verbose:      *verbose,
+		NoColor:      *noColor,
 		Token:        token,
 	}, nil
 }

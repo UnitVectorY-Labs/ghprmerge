@@ -4,7 +4,6 @@ package merger
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -15,24 +14,17 @@ import (
 
 // Merger handles the discovery, evaluation, and merging of pull requests.
 type Merger struct {
-	client    gh.Client
-	config    *config.Config
-	logOutput io.Writer
+	client  gh.Client
+	config  *config.Config
+	console *output.Console
 }
 
 // New creates a new Merger with the given client and configuration.
-func New(client gh.Client, cfg *config.Config, logOutput io.Writer) *Merger {
+func New(client gh.Client, cfg *config.Config, console *output.Console) *Merger {
 	return &Merger{
-		client:    client,
-		config:    cfg,
-		logOutput: logOutput,
-	}
-}
-
-// log writes a progress message to the log output.
-func (m *Merger) log(format string, args ...interface{}) {
-	if m.logOutput != nil && !m.config.JSON {
-		fmt.Fprintf(m.logOutput, format+"\n", args...)
+		client:  client,
+		config:  cfg,
+		console: console,
 	}
 }
 
@@ -67,25 +59,29 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		},
 	}
 
-	// Log startup info (minimal)
-	m.log("ghprmerge - %s", m.config.Org)
-	m.log("Mode: %s | Branch pattern: %s", mode, m.config.SourceBranch)
-	if m.config.RepoLimit > 0 {
-		m.log("Limit: %d repositories max", m.config.RepoLimit)
-	}
-	m.log("")
-
 	// Discover repositories
 	repos, err := m.discoverRepositories(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover repositories: %w", err)
 	}
-	m.log("Found %d repositories", len(repos))
+
+	// Print header and start progress
+	if m.console != nil && !m.config.JSON {
+		m.console.PrintHeader(m.config.Org, mode, m.config.SourceBranch)
+		if m.config.RepoLimit > 0 {
+			fmt.Fprintf(m.console.Writer(), "%s\n", m.console.Dim(fmt.Sprintf("Limit: %d repositories max", m.config.RepoLimit)))
+		}
+	}
 
 	repoCount := 0
 
 	// Process each repository sequentially
 	for i, repo := range repos {
+		// Update progress bar
+		if m.console != nil && !m.config.JSON {
+			m.console.ProgressBar(i+1, len(repos), "Scanning")
+		}
+
 		// Check repo limit
 		if m.config.RepoLimit > 0 && repoCount >= m.config.RepoLimit {
 			result.Repositories = append(result.Repositories, output.RepositoryResult{
@@ -99,9 +95,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			continue
 		}
 
-		// Process the repository first to determine if it has matching PRs.
-		// This is needed because in quiet mode, we only log repos that have
-		// matching PRs or were skipped (e.g., API errors, repo limit).
+		// Process the repository
 		var repoResult output.RepositoryResult
 		if m.config.Confirm {
 			repoResult = m.processRepositoryScanOnly(ctx, repo)
@@ -110,36 +104,11 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		}
 		result.Repositories = append(result.Repositories, repoResult)
 
-		// In quiet mode, skip logging repos with no matching PRs and no skip reason
-		hasContent := repoResult.Skipped || len(repoResult.PullRequests) > 0
-		shouldLogRepo := !m.config.Quiet || hasContent
-		if shouldLogRepo {
-			m.log("[%d/%d] %s", i+1, len(repos), repo.FullName)
-		}
-
 		if repoResult.Skipped {
 			result.Summary.ReposSkipped++
-			m.log("      ⊘ Repository skipped: %s", repoResult.SkipReason)
 		} else {
 			result.Summary.ReposProcessed++
 			repoCount++
-
-			if len(repoResult.PullRequests) == 0 {
-				if !m.config.Quiet {
-					m.log("      No matching pull requests")
-				}
-			} else {
-				// Log each PR with its complete status on one line
-				for _, pr := range repoResult.PullRequests {
-					symbol := m.getActionSymbol(pr.Action)
-					m.log("      %s #%-4d %-50s", symbol, pr.Number, truncateString(pr.Title, 50))
-					m.log("               Branch: %s", pr.HeadBranch)
-					m.log("               Status: %s", pr.Action)
-					if pr.Reason != "" {
-						m.log("               Detail: %s", pr.Reason)
-					}
-				}
-			}
 		}
 
 		// Update summary with PR results
@@ -149,47 +118,29 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		}
 	}
 
+	// Finish progress bar
+	if m.console != nil && !m.config.JSON {
+		m.console.FinishProgress()
+		fmt.Fprintln(m.console.Writer())
+	}
+
+	// Print per-repo results after progress bar completes
+	if m.console != nil && !m.config.JSON {
+		for _, repo := range result.Repositories {
+			hasMatchingPRs := len(repo.PullRequests) > 0
+			if hasMatchingPRs || (m.console.IsVerbose() && !repo.Skipped) {
+				m.console.PrintRepoResult(repo)
+			}
+		}
+	}
+
 	result.Metadata.EndTime = time.Now()
-	m.log("")
 
 	return result, nil
 }
 
-// getActionSymbol returns a symbol for the action type.
-func (m *Merger) getActionSymbol(action output.Action) string {
-	switch action {
-	case output.ActionMerged, output.ActionWouldMerge, output.ActionReadyMerge:
-		return "✓"
-	case output.ActionRebased, output.ActionWouldRebase:
-		return "↻"
-	case output.ActionMergeFailed, output.ActionRebaseFailed:
-		return "✗"
-	default:
-		if strings.HasPrefix(string(action), "skip:") {
-			return "⊘"
-		}
-		return "•"
-	}
-}
-
-// truncateString truncates a string to maxLen and adds "..." if needed.
-func truncateString(s string, maxLen int) string {
-	if maxLen <= 0 {
-		return ""
-	}
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
-
 // RunWithActions executes actions on a previously scanned result (used with --confirm).
 func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResult) (*output.RunResult, error) {
-	m.log("Executing actions...")
-
 	// Reset summary counters that will be updated
 	scanResult.Summary.MergedSuccess = 0
 	scanResult.Summary.MergeFailed = 0
@@ -200,6 +151,18 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	scanResult.Summary.Skipped = 0
 	scanResult.Summary.SkippedByReason = make(map[string]int)
 
+	// Count total actions for progress bar
+	totalActions := 0
+	for _, repo := range scanResult.Repositories {
+		for _, pr := range repo.PullRequests {
+			if pr.Action == output.ActionWouldRebase || pr.Action == output.ActionWouldMerge {
+				totalActions++
+			}
+		}
+	}
+
+	actionNum := 0
+
 	// Process each repository and execute pending actions
 	for i := range scanResult.Repositories {
 		repo := &scanResult.Repositories[i]
@@ -208,7 +171,6 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 		}
 
 		owner := strings.Split(repo.FullName, "/")[0]
-		m.log("Processing actions for: %s", repo.FullName)
 
 		for j := range repo.PullRequests {
 			pr := &repo.PullRequests[j]
@@ -216,13 +178,36 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 			// Execute actions based on what was planned
 			switch pr.Action {
 			case output.ActionWouldRebase:
+				actionNum++
+				if m.console != nil && !m.config.JSON {
+					m.console.ProgressBar(actionNum, totalActions, "Executing")
+				}
 				m.executeRebase(ctx, owner, repo.Name, pr)
 			case output.ActionWouldMerge:
+				actionNum++
+				if m.console != nil && !m.config.JSON {
+					m.console.ProgressBar(actionNum, totalActions, "Executing")
+				}
 				m.executeMerge(ctx, owner, repo.Name, pr)
 			}
 
 			// Update summary
 			m.updateSummary(&scanResult.Summary, *pr)
+		}
+	}
+
+	// Finish progress bar
+	if m.console != nil && !m.config.JSON && totalActions > 0 {
+		m.console.FinishProgress()
+		fmt.Fprintln(m.console.Writer())
+	}
+
+	// Print action results
+	if m.console != nil && !m.config.JSON {
+		for _, repo := range scanResult.Repositories {
+			if len(repo.PullRequests) > 0 {
+				m.console.PrintRepoResult(repo)
+			}
 		}
 	}
 
@@ -236,21 +221,17 @@ func (m *Merger) executeRebase(ctx context.Context, owner, repoName string, pr *
 		if err := m.client.PostRebaseComment(ctx, owner, repoName, pr.Number); err != nil {
 			pr.Action = output.ActionRebaseFailed
 			pr.Reason = fmt.Sprintf("failed to post rebase comment: %v", err)
-			m.log("  ✗ PR #%d: rebase failed - %v", pr.Number, err)
 		} else {
 			pr.Action = output.ActionRebased
 			pr.Reason = "posted @dependabot rebase comment"
-			m.log("  ↻ PR #%d: rebased (posted @dependabot rebase comment)", pr.Number)
 		}
 	} else {
 		if err := m.client.UpdateBranch(ctx, owner, repoName, pr.Number); err != nil {
 			pr.Action = output.ActionRebaseFailed
 			pr.Reason = fmt.Sprintf("failed to update branch: %v", err)
-			m.log("  ✗ PR #%d: rebase failed - %v", pr.Number, err)
 		} else {
 			pr.Action = output.ActionRebased
 			pr.Reason = "branch update requested via API"
-			m.log("  ↻ PR #%d: rebased (branch updated via API)", pr.Number)
 		}
 	}
 }
@@ -260,11 +241,9 @@ func (m *Merger) executeMerge(ctx context.Context, owner, repoName string, pr *o
 	if err := m.client.MergePullRequest(ctx, owner, repoName, pr.Number); err != nil {
 		pr.Action = output.ActionMergeFailed
 		pr.Reason = fmt.Sprintf("merge failed: %v", err)
-		m.log("  ✗ PR #%d: merge failed - %v", pr.Number, err)
 	} else {
 		pr.Action = output.ActionMerged
 		pr.Reason = "successfully merged"
-		m.log("  ✓ PR #%d: merged", pr.Number)
 	}
 }
 
