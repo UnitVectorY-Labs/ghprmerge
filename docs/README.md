@@ -18,8 +18,8 @@ ghprmerge is designed to be **safe by default**:
 1. **Default is analysis only** - Without explicit `--rebase` or `--merge` flags, the tool only scans and reports what it would do
 2. **Explicit action flags** - Use `--rebase` to update branches, `--merge` to merge PRs, or `--merge --skip-rebase` to merge without requiring up-to-date branches
 3. **Strict readiness checks** - A PR is only considered ready if:
-   - All check runs have a successful conclusion (including non-required checks)
-   - All commit status contexts are successful
+   - All check runs have a successful conclusion (including non-required checks), or no checks are configured at all
+   - All commit status contexts are successful, or no statuses are configured at all
    - No merge conflicts
    - Branch is fully up to date with the default branch (unless `--skip-rebase` is used)
 4. **Sequential processing** - Repositories are processed one at a time, never in parallel
@@ -48,7 +48,10 @@ For each repository (processed sequentially):
    - If `--merge` and PR is valid: attempt merge
    - If `--merge --skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
-4. Show progress bar during scanning, then print results for repos with matching PRs
+4. Show progress bar during scanning
+   - In the default view, print matching repos after the scan completes
+   - With `--verbose`, stream each repository result as soon as it is known
+   - With `--confirm`, clear the pending scan output before showing execution results
 5. Print condensed summary
 
 ## Contents

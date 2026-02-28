@@ -91,6 +91,11 @@ func (c *Console) FinishProgress() {
 	fmt.Fprintln(c.w)
 }
 
+// ClearCurrentLine clears the current terminal line.
+func (c *Console) ClearCurrentLine() {
+	fmt.Fprint(c.w, "\r\033[2K")
+}
+
 // ClearLines clears n lines above the current position using ANSI escape codes.
 func (c *Console) ClearLines(n int) {
 	for i := 0; i < n; i++ {
@@ -105,11 +110,18 @@ func (c *Console) PrintHeader(org, mode, branch string) {
 }
 
 // PrintRepoResult prints the result for a single repository's pull requests.
-func (c *Console) PrintRepoResult(repo RepositoryResult) {
+// It returns the number of terminal lines written.
+func (c *Console) PrintRepoResult(repo RepositoryResult) int {
+	if repo.Skipped {
+		fmt.Fprintf(c.w, "  %s %s\n", c.Dim("⊘"), c.Dim(repo.FullName+" ─ "+repo.SkipReason))
+		return 1
+	}
+
 	if len(repo.PullRequests) == 0 {
 		fmt.Fprintf(c.w, "  %s %s\n", c.Dim("─"), c.Dim(repo.FullName+" ─ no matching pull requests"))
-		return
+		return 1
 	}
+	lines := 0
 	for _, pr := range repo.PullRequests {
 		symbol := c.getActionSymbol(pr.Action)
 		colored := c.colorAction(symbol, pr.Action)
@@ -121,16 +133,20 @@ func (c *Console) PrintRepoResult(repo RepositoryResult) {
 			actionStr += " ─ " + pr.Reason
 		}
 		fmt.Fprintf(c.w, "    %s\n", c.colorActionText(actionStr, pr.Action))
+		lines += 2
 	}
+	return lines
 }
 
 // PrintPendingAction prints a single pending action line for confirmation mode.
-func (c *Console) PrintPendingAction(repo RepositoryResult, pr PullRequestResult) {
+// It returns the number of terminal lines written.
+func (c *Console) PrintPendingAction(repo RepositoryResult, pr PullRequestResult) int {
 	symbol := c.getActionSymbol(pr.Action)
 	colored := c.colorAction(symbol, pr.Action)
 	title := truncateString(pr.Title, 50)
 	fmt.Fprintf(c.w, "  %s %s #%d %s\n", colored, repo.FullName, pr.Number, title)
 	fmt.Fprintf(c.w, "    %s\n", c.colorActionText(string(pr.Action), pr.Action))
+	return 2
 }
 
 // PrintSummary prints a condensed summary line.

@@ -114,19 +114,17 @@ type RunSummary struct {
 
 // Writer handles output formatting.
 type Writer struct {
-	out       io.Writer
-	jsonMode  bool
-	quietMode bool
-	noColor   bool
+	out      io.Writer
+	jsonMode bool
+	noColor  bool
 }
 
 // NewWriter creates a new Writer.
-func NewWriter(out io.Writer, jsonMode bool, quietMode bool, noColor bool) *Writer {
+func NewWriter(out io.Writer, jsonMode bool, noColor bool) *Writer {
 	return &Writer{
-		out:       out,
-		jsonMode:  jsonMode,
-		quietMode: quietMode,
-		noColor:   noColor,
+		out:      out,
+		jsonMode: jsonMode,
+		noColor:  noColor,
 	}
 }
 

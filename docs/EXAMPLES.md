@@ -45,6 +45,8 @@ ghprmerge --org myorg --source-branch dependabot/ --merge
 
 PRs that are behind the default branch will be skipped (use `--rebase` first to update them, or `--skip-rebase` to merge anyway).
 
+PRs with no checks configured are allowed to merge. PRs with pending checks are still skipped.
+
 ## Merge with Skip Rebase
 
 Merge PRs even when they are behind the default branch:
@@ -69,13 +71,23 @@ This is useful when you want to review the planned actions before execution. Pen
 
 ## Verbose Output
 
-Show all repositories, including those with no matching pull requests:
+Stream repository decisions as each repository is scanned, including repositories with no matching pull requests:
 
 ```bash
 ghprmerge --org myorg --source-branch dependabot/ --verbose
 ```
 
-By default, only repositories with matching PRs are displayed in the output.
+By default, the scan stays quiet apart from the progress bar and only repositories with matching PRs are displayed after the scan completes.
+
+## Verbose Confirmation Mode
+
+Stream scan-time decisions, then clear them before showing the actions that were actually performed:
+
+```bash
+ghprmerge --org myorg --source-branch dependabot/ --merge --confirm --verbose
+```
+
+This is useful when you want live visibility during the scan without leaving the terminal full of pending entries after you confirm.
 
 ## Disable Colored Output
 

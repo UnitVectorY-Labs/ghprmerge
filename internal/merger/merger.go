@@ -14,9 +14,10 @@ import (
 
 // Merger handles the discovery, evaluation, and merging of pull requests.
 type Merger struct {
-	client  gh.Client
-	config  *config.Config
-	console *output.Console
+	client           gh.Client
+	config           *config.Config
+	console          *output.Console
+	scanDisplayLines int
 }
 
 // New creates a new Merger with the given client and configuration.
@@ -31,6 +32,7 @@ func New(client gh.Client, cfg *config.Config, console *output.Console) *Merger 
 // Run executes the merger logic and returns the result.
 // Processing is strictly sequential: one repository at a time, one PR at a time.
 func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
+	m.scanDisplayLines = 0
 	startTime := time.Now()
 
 	// Determine mode description
@@ -74,61 +76,69 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 	}
 
 	repoCount := 0
+	showProgress := m.console != nil && !m.config.JSON && len(repos) > 0
 
 	// Process each repository sequentially
 	for i, repo := range repos {
 		// Update progress bar
-		if m.console != nil && !m.config.JSON {
+		if showProgress {
 			m.console.ProgressBar(i+1, len(repos), "Scanning")
 		}
 
 		// Check repo limit
+		var repoResult output.RepositoryResult
 		if m.config.RepoLimit > 0 && repoCount >= m.config.RepoLimit {
-			result.Repositories = append(result.Repositories, output.RepositoryResult{
+			repoResult = output.RepositoryResult{
 				Name:          repo.Name,
 				FullName:      repo.FullName,
 				DefaultBranch: repo.DefaultBranch,
 				Skipped:       true,
 				SkipReason:    "repo limit reached",
-			})
-			result.Summary.ReposSkipped++
-			continue
-		}
-
-		// Process the repository
-		var repoResult output.RepositoryResult
-		if m.config.Confirm {
-			repoResult = m.processRepositoryScanOnly(ctx, repo)
-		} else {
-			repoResult = m.processRepository(ctx, repo)
-		}
-		result.Repositories = append(result.Repositories, repoResult)
-
-		if repoResult.Skipped {
+			}
+			result.Repositories = append(result.Repositories, repoResult)
 			result.Summary.ReposSkipped++
 		} else {
-			result.Summary.ReposProcessed++
-			repoCount++
+			if m.config.Confirm {
+				repoResult = m.processRepositoryScanOnly(ctx, repo)
+			} else {
+				repoResult = m.processRepository(ctx, repo)
+			}
+			result.Repositories = append(result.Repositories, repoResult)
+
+			if repoResult.Skipped {
+				result.Summary.ReposSkipped++
+			} else {
+				result.Summary.ReposProcessed++
+				repoCount++
+			}
+
+			// Update summary with PR results
+			for _, pr := range repoResult.PullRequests {
+				result.Summary.CandidatesFound++
+				m.updateSummary(&result.Summary, pr)
+			}
 		}
 
-		// Update summary with PR results
-		for _, pr := range repoResult.PullRequests {
-			result.Summary.CandidatesFound++
-			m.updateSummary(&result.Summary, pr)
+		if showProgress && m.shouldStreamScanResults() {
+			m.scanDisplayLines += m.printRepoResultWithProgress(repoResult, i+1, len(repos), "Scanning")
 		}
 	}
 
 	// Finish progress bar
-	if m.console != nil && !m.config.JSON {
+	if showProgress {
 		m.console.FinishProgress()
-		fmt.Fprintln(m.console.Writer())
+		if m.shouldStreamScanResults() {
+			m.scanDisplayLines++
+		}
 	}
 
-	// Print per-repo results after progress bar completes
-	if m.console != nil && !m.config.JSON {
+	// In the default human view, print matching repositories after the scan completes.
+	// Confirm mode still needs this fallback when there is nothing to confirm so the
+	// user can see which repos matched and why they were skipped.
+	if m.console != nil && !m.config.JSON && !m.config.Verbose && (!m.config.Confirm || !hasPendingActions(result)) {
+		fmt.Fprintln(m.console.Writer())
 		for _, repo := range result.Repositories {
-			hasMatchingPRs := len(repo.PullRequests) > 0
-			if hasMatchingPRs || (m.console.IsVerbose() && !repo.Skipped) {
+			if len(repo.PullRequests) > 0 {
 				m.console.PrintRepoResult(repo)
 			}
 		}
@@ -162,6 +172,7 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	}
 
 	actionNum := 0
+	showProgress := m.console != nil && !m.config.JSON && totalActions > 0
 
 	// Process each repository and execute pending actions
 	for i := range scanResult.Repositories {
@@ -179,13 +190,13 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 			switch pr.Action {
 			case output.ActionWouldRebase:
 				actionNum++
-				if m.console != nil && !m.config.JSON {
+				if showProgress {
 					m.console.ProgressBar(actionNum, totalActions, "Executing")
 				}
 				m.executeRebase(ctx, owner, repo.Name, pr)
 			case output.ActionWouldMerge:
 				actionNum++
-				if m.console != nil && !m.config.JSON {
+				if showProgress {
 					m.console.ProgressBar(actionNum, totalActions, "Executing")
 				}
 				m.executeMerge(ctx, owner, repo.Name, pr)
@@ -194,18 +205,24 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 			// Update summary
 			m.updateSummary(&scanResult.Summary, *pr)
 		}
+
+		if showProgress && m.config.Verbose && hasCompletedActions(*repo) {
+			m.printRepoResultWithProgress(*repo, actionNum, totalActions, "Executing")
+		}
 	}
 
 	// Finish progress bar
-	if m.console != nil && !m.config.JSON && totalActions > 0 {
+	if showProgress {
 		m.console.FinishProgress()
-		fmt.Fprintln(m.console.Writer())
 	}
 
 	// Print action results
 	if m.console != nil && !m.config.JSON {
 		for _, repo := range scanResult.Repositories {
-			if len(repo.PullRequests) > 0 {
+			if m.config.Verbose {
+				continue
+			}
+			if hasCompletedActions(repo) {
 				m.console.PrintRepoResult(repo)
 			}
 		}
@@ -213,6 +230,11 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 
 	scanResult.Metadata.EndTime = time.Now()
 	return scanResult, nil
+}
+
+// ScanDisplayLines returns the number of scan-time terminal lines written for live verbose output.
+func (m *Merger) ScanDisplayLines() int {
+	return m.scanDisplayLines
 }
 
 // executeRebase executes a rebase action on a PR.
@@ -297,26 +319,24 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	// When in rebase-only mode, we don't require passing checks since rebasing
 	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
+	checksState := "all checks passing"
 
 	if checkStatus.NoChecks {
-		result.Action = output.ActionSkipNoChecks
-		result.Reason = "no checks found for this pull request"
-		result.SkipReason = output.ReasonNoChecks
-		return result
-	}
+		checksState = "no checks configured"
+	} else {
+		if checkStatus.Pending && !rebaseOnly {
+			result.Action = output.ActionSkipChecksPending
+			result.Reason = checkStatus.Details
+			result.SkipReason = output.ReasonChecksPending
+			return result
+		}
 
-	if checkStatus.Pending && !rebaseOnly {
-		result.Action = output.ActionSkipChecksPending
-		result.Reason = checkStatus.Details
-		result.SkipReason = output.ReasonChecksPending
-		return result
-	}
-
-	if !checkStatus.AllPassing && !rebaseOnly {
-		result.Action = output.ActionSkipChecksFailing
-		result.Reason = checkStatus.Details
-		result.SkipReason = output.ReasonChecksFailing
-		return result
+		if !checkStatus.AllPassing && !rebaseOnly {
+			result.Action = output.ActionSkipChecksFailing
+			result.Reason = checkStatus.Details
+			result.SkipReason = output.ReasonChecksFailing
+			return result
+		}
 	}
 
 	// Check branch status
@@ -341,7 +361,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		// If skip-rebase is enabled with merge, would merge despite being behind
 		if m.config.SkipRebase && m.config.Merge {
 			result.Action = output.ActionWouldMerge
-			result.Reason = fmt.Sprintf("all checks passing, would merge (branch is %d commits behind, rebase skipped)", branchStatus.BehindBy)
+			result.Reason = fmt.Sprintf("%s, would merge (branch is %d commits behind, rebase skipped)", checksState, branchStatus.BehindBy)
 			return result
 		}
 
@@ -367,10 +387,10 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	// All conditions met, ready to merge
 	if m.config.Merge {
 		result.Action = output.ActionWouldMerge
-		result.Reason = "all checks passing, branch up to date"
+		result.Reason = checksState + ", branch up to date"
 	} else {
 		result.Action = output.ActionReadyMerge
-		result.Reason = "all checks passing, branch up to date (use --merge to merge)"
+		result.Reason = checksState + ", branch up to date (use --merge to merge)"
 	}
 
 	return result
@@ -385,6 +405,37 @@ func (m *Merger) getModeDescription() string {
 		return "merge mode"
 	}
 	return "analysis only (no mutations)"
+}
+
+func (m *Merger) shouldStreamScanResults() bool {
+	return m.config.Verbose
+}
+
+func (m *Merger) printRepoResultWithProgress(repo output.RepositoryResult, current, total int, label string) int {
+	if m.console == nil || m.config.JSON {
+		return 0
+	}
+
+	m.console.ClearCurrentLine()
+	lines := m.console.PrintRepoResult(repo)
+	if total > 0 {
+		m.console.ProgressBar(current, total, label)
+	}
+	return lines
+}
+
+func hasCompletedActions(repo output.RepositoryResult) bool {
+	for _, pr := range repo.PullRequests {
+		switch pr.Action {
+		case output.ActionMerged, output.ActionMergeFailed, output.ActionRebased, output.ActionRebaseFailed:
+			return true
+		}
+	}
+	return false
+}
+
+func hasPendingActions(result *output.RunResult) bool {
+	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
 }
 
 // updateSummary updates the run summary based on a PR result.
@@ -527,26 +578,24 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 	// When in rebase-only mode, we don't require passing checks since rebasing
 	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
+	checksState := "all checks passing"
 
 	if checkStatus.NoChecks {
-		result.Action = output.ActionSkipNoChecks
-		result.Reason = "no checks found for this pull request"
-		result.SkipReason = output.ReasonNoChecks
-		return result
-	}
+		checksState = "no checks configured"
+	} else {
+		if checkStatus.Pending && !rebaseOnly {
+			result.Action = output.ActionSkipChecksPending
+			result.Reason = checkStatus.Details
+			result.SkipReason = output.ReasonChecksPending
+			return result
+		}
 
-	if checkStatus.Pending && !rebaseOnly {
-		result.Action = output.ActionSkipChecksPending
-		result.Reason = checkStatus.Details
-		result.SkipReason = output.ReasonChecksPending
-		return result
-	}
-
-	if !checkStatus.AllPassing && !rebaseOnly {
-		result.Action = output.ActionSkipChecksFailing
-		result.Reason = checkStatus.Details
-		result.SkipReason = output.ReasonChecksFailing
-		return result
+		if !checkStatus.AllPassing && !rebaseOnly {
+			result.Action = output.ActionSkipChecksFailing
+			result.Reason = checkStatus.Details
+			result.SkipReason = output.ReasonChecksFailing
+			return result
+		}
 	}
 
 	// Check branch status
@@ -568,15 +617,15 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 
 	// Check if branch is up to date
 	if !branchStatus.UpToDate {
-		return m.handleOutdatedBranch(ctx, owner, repo, pr, branchStatus)
+		return m.handleOutdatedBranch(ctx, owner, repo, pr, branchStatus, checksState)
 	}
 
 	// All conditions met, ready to merge
-	return m.handleMergeReady(ctx, owner, repo, pr)
+	return m.handleMergeReady(ctx, owner, repo, pr, checksState)
 }
 
 // handleOutdatedBranch handles PRs where the branch is behind the default branch.
-func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest, branchStatus *gh.BranchStatus) output.PullRequestResult {
+func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest, branchStatus *gh.BranchStatus, checksState string) output.PullRequestResult {
 	result := output.PullRequestResult{
 		Number:     pr.Number,
 		URL:        pr.URL,
@@ -593,7 +642,7 @@ func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh
 			return result
 		}
 		result.Action = output.ActionMerged
-		result.Reason = fmt.Sprintf("successfully merged (branch was %d commits behind, rebase skipped)", branchStatus.BehindBy)
+		result.Reason = fmt.Sprintf("successfully merged (%s; branch was %d commits behind, rebase skipped)", checksState, branchStatus.BehindBy)
 		return result
 	}
 
@@ -628,7 +677,7 @@ func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh
 }
 
 // handleMergeReady handles PRs that are ready to merge.
-func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest) output.PullRequestResult {
+func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest, checksState string) output.PullRequestResult {
 	result := output.PullRequestResult{
 		Number:     pr.Number,
 		URL:        pr.URL,
@@ -639,7 +688,7 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 	// If merge is not enabled, just report
 	if !m.config.Merge {
 		result.Action = output.ActionReadyMerge
-		result.Reason = "all checks passing, branch up to date (use --merge to merge)"
+		result.Reason = checksState + ", branch up to date (use --merge to merge)"
 		return result
 	}
 
@@ -651,6 +700,6 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 	}
 
 	result.Action = output.ActionMerged
-	result.Reason = "successfully merged"
+	result.Reason = "successfully merged (" + checksState + ")"
 	return result
 }

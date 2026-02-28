@@ -75,10 +75,9 @@ func run() error {
 
 	// If confirm mode is enabled and there are actions to take, prompt user
 	if cfg.Confirm && hasActionsToPerform(result) {
-		// Count pending action lines for clearing later
-		pendingLines := countPendingLines(result)
-
-		if !promptConfirmation(console, result) {
+		showPending := !cfg.Verbose
+		proceed, promptLines := promptConfirmation(console, result, showPending)
+		if !proceed {
 			if console != nil {
 				fmt.Fprintln(os.Stderr, console.Dim("Operation cancelled by user."))
 			} else {
@@ -87,10 +86,12 @@ func run() error {
 			return nil
 		}
 
-		// Clear the pending actions and prompt from the terminal
 		if console != nil {
-			// +3 for the prompt line, blank line before prompt, and the user's input line
-			console.ClearLines(pendingLines + 3)
+			linesToClear := promptLines
+			if cfg.Verbose {
+				linesToClear += m.ScanDisplayLines()
+			}
+			console.ClearLines(linesToClear)
 		}
 
 		// Re-run with actions enabled
@@ -101,7 +102,7 @@ func run() error {
 	}
 
 	// Output results (condensed summary for human mode, full JSON for JSON mode)
-	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.Quiet, cfg.NoColor)
+	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.NoColor)
 	return writer.WriteResult(result)
 }
 
@@ -110,54 +111,47 @@ func hasActionsToPerform(result *output.RunResult) bool {
 	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
 }
 
-// countPendingLines counts the number of terminal lines used for pending action display.
-// This must stay in sync with PrintPendingAction's output format (2 lines per action).
-func countPendingLines(result *output.RunResult) int {
-	lines := 0
-	for _, repo := range result.Repositories {
-		for _, pr := range repo.PullRequests {
-			if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
-				lines += 2 // symbol line + action detail line
-			}
-		}
-	}
-	if lines > 0 {
-		lines++ // "Pending actions:" header
-	}
-	return lines
-}
-
 // promptConfirmation displays pending actions and prompts for confirmation.
-func promptConfirmation(console *output.Console, result *output.RunResult) bool {
-	if console != nil {
+// It returns whether to proceed and the number of visible terminal lines written.
+func promptConfirmation(console *output.Console, result *output.RunResult, showPending bool) (bool, int) {
+	lines := 0
+
+	if showPending && console != nil {
 		fmt.Fprintln(os.Stderr, console.Bold("Pending actions:"))
+		lines++
 		for _, repo := range result.Repositories {
 			for _, pr := range repo.PullRequests {
 				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
-					console.PrintPendingAction(repo, pr)
+					lines += console.PrintPendingAction(repo, pr)
 				}
 			}
 		}
-	} else {
+	} else if showPending {
 		fmt.Fprintln(os.Stderr, "Pending actions:")
+		lines++
 		for _, repo := range result.Repositories {
 			for _, pr := range repo.PullRequests {
 				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
 					fmt.Fprintf(os.Stderr, "  %s #%d %s ─ %s\n", repo.FullName, pr.Number, pr.Title, pr.Action)
+					lines++
 				}
 			}
 		}
 	}
 
-	fmt.Fprintln(os.Stderr)
+	if showPending {
+		fmt.Fprintln(os.Stderr)
+		lines++
+	}
 	fmt.Fprint(os.Stderr, "Do you want to proceed? [y/N]: ")
+	lines++
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return false
+		return false, lines
 	}
 
 	input = strings.TrimSpace(strings.ToLower(input))
-	return input == "y" || input == "yes"
+	return input == "y" || input == "yes", lines
 }

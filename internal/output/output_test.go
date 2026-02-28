@@ -10,7 +10,7 @@ import (
 
 func TestWriterHumanOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, false, true) // noColor=true for predictable output
+	writer := NewWriter(&buf, false, true) // noColor=true for predictable output
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -69,7 +69,7 @@ func TestWriterHumanOutput(t *testing.T) {
 
 func TestWriterJSONOutput(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, true, false, true)
+	writer := NewWriter(&buf, true, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -156,7 +156,7 @@ func TestActionConstants(t *testing.T) {
 
 func TestWriterSummaryShowsCorrectCounts(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, false, true)
+	writer := NewWriter(&buf, false, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{
@@ -208,7 +208,7 @@ func TestWriterSummaryShowsCorrectCounts(t *testing.T) {
 
 func TestWriterSummaryHidesZeroCounts(t *testing.T) {
 	var buf bytes.Buffer
-	writer := NewWriter(&buf, false, false, true)
+	writer := NewWriter(&buf, false, true)
 
 	result := &RunResult{
 		Metadata: RunMetadata{

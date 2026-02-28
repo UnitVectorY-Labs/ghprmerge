@@ -24,13 +24,15 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase
 # Merge ready PRs (that are already up-to-date)
 ghprmerge --org myorg --source-branch dependabot/ --merge
 
+# PRs with no checks configured are allowed; pending checks still block merging
+
 # Merge PRs even if behind (skip rebase requirement)
 ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
 
-# Use --confirm to review before taking actions
+# Use --confirm to review pending actions before taking action
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 
-# Show all repos (including those with no matching PRs)
+# Stream all repo results as they are scanned
 ghprmerge --org myorg --source-branch dependabot/ --verbose
 
 # Disable colored output

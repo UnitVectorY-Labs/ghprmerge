@@ -26,8 +26,7 @@ ghprmerge [flags]
 | `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
 | `--json` | `false` | No | Output structured JSON |
 | `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
-| `--quiet` | `false` | No | Suppress repos with no matching pull requests (now the default, kept for compatibility) |
-| `--verbose` | `false` | No | Show all repositories including those with no matching pull requests |
+| `--verbose` | `false` | No | Stream repository results during scanning, including repos with no matching pull requests |
 | `--no-color` | `false` | No | Disable colored output |
 | `--version` | - | No | Show version information and exit |
 
@@ -92,9 +91,11 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ```
 
 - Scans all repositories first with a progress bar
-- Displays a list of pending actions (PRs that would be rebased or merged)
+- In the default view, displays a list of pending actions before prompting
+- With `--verbose`, streams scan-time repository results as they are discovered
 - Prompts for user confirmation before executing
-- On confirmation, clears the pending list and shows execution progress with results
+- On confirmation, clears the pending scan/prompt output and shows execution progress with actual results
+- If no actions are pending, prints the matching repository results and skip reasons instead of prompting
 - Useful for reviewing changes before taking action
 
 ### Verbose Output
@@ -103,8 +104,9 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ghprmerge --org myorg --source-branch dependabot/ --verbose
 ```
 
-- Shows all repositories, including those with no matching pull requests
-- By default, only repositories with matching PRs are displayed
+- Streams repository results live while the scan runs
+- Includes repositories with no matching pull requests
+- By default, the scan stays quiet apart from the progress bar, and only repositories with matching PRs are shown after the scan
 
 ### Disable Colors
 
@@ -157,7 +159,8 @@ Repositories are processed **one at a time**. The tool:
 - Never loads all org data before performing mutations
 - Never operates on multiple repos in parallel
 - Shows a progress bar as repositories are scanned
-- Prints results for repos with matching PRs after the scan completes
+- In default output, prints matching repository results after the scan completes
+- With `--verbose`, streams every repository result as soon as it is known
 
 ## Archived Repository Handling
 
@@ -175,11 +178,12 @@ When a PR is skipped, one of these reasons is shown:
 | `merge conflict` | PR has merge conflicts |
 | `checks failing` | One or more checks failed (includes check name) |
 | `checks pending` | Checks are still running |
-| `no checks found` | No checks configured for this PR |
 | `branch behind default` | Branch is out of date (and `--rebase` not set) |
 | `branch updated, awaiting checks` | Rebase was done, waiting for checks |
 | `insufficient permissions` | Token lacks required permissions |
 | `API error` | GitHub API error (includes details) |
+
+Pull requests with no checks configured are allowed to proceed. Pending checks still block merge decisions.
 
 ## Output Format
 
@@ -197,8 +201,15 @@ A progress bar is shown during scanning:
 Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
 ```
 
-After scanning, only repositories with matching PRs are shown (use `--verbose` to see all repositories). Each matching PR is displayed with its action and details:
+By default, after scanning only repositories with matching PRs are shown. Each matching PR is displayed with its action and details:
 ```
+  ✓ myorg/repo1 #42 Bump lodash to 4.17.21
+    would merge ─ all checks passing, branch up to date
+```
+
+With `--verbose`, repository results are emitted live during scanning, including repositories with no matching pull requests:
+```
+  ─ myorg/repo2 ─ no matching pull requests
   ✓ myorg/repo1 #42 Bump lodash to 4.17.21
     would merge ─ all checks passing, branch up to date
 ```

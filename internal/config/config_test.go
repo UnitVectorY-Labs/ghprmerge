@@ -26,7 +26,6 @@ func TestParseFlags(t *testing.T) {
 		wantSkipRebase bool
 		wantRepoLimit  int
 		wantJSON       bool
-		wantQuiet      bool
 		wantVerbose    bool
 		wantNoColor    bool
 		wantRepos      []string
@@ -42,7 +41,6 @@ func TestParseFlags(t *testing.T) {
 			wantMerge:     false,
 			wantRepoLimit: 10,
 			wantJSON:      true,
-			wantQuiet:     false,
 		},
 		{
 			name:          "defaults applied",
@@ -88,14 +86,6 @@ func TestParseFlags(t *testing.T) {
 			wantBranch: "dependabot/",
 			wantRebase: false,
 			wantMerge:  true,
-		},
-		{
-			name:       "quiet mode",
-			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--quiet"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "dependabot/",
-			wantQuiet:  true,
 		},
 		{
 			name:           "skip-rebase with merge",
@@ -158,9 +148,6 @@ func TestParseFlags(t *testing.T) {
 			if cfg.JSON != tt.wantJSON {
 				t.Errorf("JSON = %v, want %v", cfg.JSON, tt.wantJSON)
 			}
-			if cfg.Quiet != tt.wantQuiet {
-				t.Errorf("Quiet = %v, want %v", cfg.Quiet, tt.wantQuiet)
-			}
 			if cfg.Verbose != tt.wantVerbose {
 				t.Errorf("Verbose = %v, want %v", cfg.Verbose, tt.wantVerbose)
 			}
@@ -173,6 +160,15 @@ func TestParseFlags(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseFlagsRejectsQuiet(t *testing.T) {
+	os.Setenv("GITHUB_TOKEN", "test-token")
+	defer os.Unsetenv("GITHUB_TOKEN")
+
+	if _, err := ParseFlags([]string{"--org", "myorg", "--source-branch", "dependabot/", "--quiet"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected error for removed --quiet flag")
 	}
 }
 
