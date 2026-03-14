@@ -1,6 +1,6 @@
 module github.com/UnitVectorY-Labs/ghprmerge
 
-go 1.26.0 // GOVERSION
+go 1.26 // GOVERSION
 
 require (
 	github.com/google/go-github/v60 v60.0.0
