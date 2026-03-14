@@ -49,9 +49,10 @@ For each repository (processed sequentially):
    - If `--merge --skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
 4. Show progress bar during scanning
-   - In the default view, print matching repos after the scan completes
+   - When an action is performed (merge or rebase), stream the result to the console immediately with the progress bar continuing below
+   - In analysis mode, print matching repos after the scan completes
    - With `--verbose`, stream each repository result as soon as it is known
-   - With `--confirm`, clear the pending scan output before showing execution results
+   - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
 
 ## Contents

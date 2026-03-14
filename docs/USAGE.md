@@ -90,11 +90,11 @@ ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
 ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 ```
 
-- Scans all repositories first with a progress bar
+- Scans all repositories first with a progress bar (no actions taken during scan)
 - In the default view, displays a list of pending actions before prompting
 - With `--verbose`, streams scan-time repository results as they are discovered
 - Prompts for user confirmation before executing
-- On confirmation, clears the pending scan/prompt output and shows execution progress with actual results
+- On confirmation, clears the pending scan/prompt output and streams each action result as it completes, with the progress bar continuing below
 - If no actions are pending, prints the matching repository results and skip reasons instead of prompting
 - Useful for reviewing changes before taking action
 
@@ -159,8 +159,10 @@ Repositories are processed **one at a time**. The tool:
 - Never loads all org data before performing mutations
 - Never operates on multiple repos in parallel
 - Shows a progress bar as repositories are scanned
-- In default output, prints matching repository results after the scan completes
+- When an action is performed (merge or rebase), the result is streamed to the console immediately as it happens, with the progress bar continuing below
+- In analysis mode (no `--merge` or `--rebase`), prints matching repository results after the scan completes
 - With `--verbose`, streams every repository result as soon as it is known
+- With `--confirm`, streams action results during the execution phase after the user confirms
 
 ## Archived Repository Handling
 
@@ -201,10 +203,17 @@ A progress bar is shown during scanning:
 Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
 ```
 
-By default, after scanning only repositories with matching PRs are shown. Each matching PR is displayed with its action and details:
+In analysis mode (no `--merge` or `--rebase`), after scanning only repositories with matching PRs are shown. Each matching PR is displayed with its action and details:
 ```
   ✓ myorg/repo1 #42 Bump lodash to 4.17.21
     would merge ─ all checks passing, branch up to date
+```
+
+When actions are performed (`--merge` or `--rebase`), each result is streamed to the console as soon as the action completes, with the progress bar continuing below:
+```
+  ✓ myorg/repo1 #42 Bump lodash to 4.17.21
+    merged ─ successfully merged (all checks passing)
+Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
 ```
 
 With `--verbose`, repository results are emitted live during scanning, including repositories with no matching pull requests:
