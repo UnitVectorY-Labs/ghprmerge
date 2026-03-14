@@ -1236,6 +1236,135 @@ func TestMergerRebaseWithFailingChecks(t *testing.T) {
 	}
 }
 
+func TestMergerMergeModeStreamsActionResultsDuringScan(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+		{
+			Name:          "repo2",
+			FullName:      "testorg/repo2",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+	}
+
+	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	out := buf.String()
+	// Action result should be streamed during the scan (not deferred)
+	if !strings.Contains(out, "testorg/repo1 #1 Bump lodash") {
+		t.Fatalf("expected merge action to be streamed during scan, got:\n%s", out)
+	}
+	if !strings.Contains(out, "merged") {
+		t.Fatalf("expected merged status in streamed output, got:\n%s", out)
+	}
+	// Repo without matching PRs should NOT appear (non-verbose mode)
+	if strings.Contains(out, "testorg/repo2") {
+		t.Fatalf("expected repo without matching PRs to be omitted in non-verbose mode, got:\n%s", out)
+	}
+	// Should not be printed twice
+	if strings.Count(out, "testorg/repo1 #1 Bump lodash") != 1 {
+		t.Fatalf("expected action result to appear exactly once, got:\n%s", out)
+	}
+
+	if result.Summary.MergedSuccess != 1 {
+		t.Fatalf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+}
+
+func TestMergerRunWithActionsStreamsDuringExecution(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo1",
+			FullName:      "testorg/repo1",
+			DefaultBranch: "main",
+		},
+	}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo1/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			HeadSHA:    "abc123",
+			RepoName:   "repo1",
+		},
+	}
+	mock.CheckStatuses["testorg/repo1/abc123"] = &github.CheckStatus{
+		AllPassing: true,
+		Details:    "all checks passing",
+	}
+
+	var buf bytes.Buffer
+	cfg := &config.Config{
+		Org:          "testorg",
+		SourceBranch: "dependabot/",
+		Merge:        true,
+		Confirm:      true,
+	}
+
+	// Non-verbose confirm mode: scan first, then execute
+	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	scanResult, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	buf.Reset()
+	result, err := m.RunWithActions(context.Background(), scanResult)
+	if err != nil {
+		t.Fatalf("RunWithActions() error = %v", err)
+	}
+
+	out := buf.String()
+	// Action should be streamed during execution even without verbose
+	if !strings.Contains(out, "merged") {
+		t.Fatalf("expected execution output to show completed action, got:\n%s", out)
+	}
+	if strings.Contains(out, "would merge") {
+		t.Fatalf("expected execution output to replace pending action text, got:\n%s", out)
+	}
+	// Should appear exactly once (no duplicate from post-loop printing)
+	if strings.Count(out, "testorg/repo1 #1 Bump lodash") != 1 {
+		t.Fatalf("expected action result to appear exactly once, got:\n%s", out)
+	}
+
+	if result.Summary.MergedSuccess != 1 {
+		t.Fatalf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
+	}
+}
+
 func TestMergerRebaseWithPendingChecks(t *testing.T) {
 	mock := github.NewMockClient()
 	mock.Repositories = []github.Repository{
