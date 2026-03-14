@@ -138,19 +138,16 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 	// Confirm mode still needs this fallback when there is nothing to confirm so the
 	// user can see which repos matched and why they were skipped.
 	if m.console != nil && !m.config.JSON && !m.config.Verbose && (!m.config.Confirm || !hasPendingActions(result)) {
-		hasUnprinted := false
+		var toPrint []output.RepositoryResult
 		for _, repo := range result.Repositories {
 			if len(repo.PullRequests) > 0 && !hasCompletedActions(repo) {
-				hasUnprinted = true
-				break
+				toPrint = append(toPrint, repo)
 			}
 		}
-		if hasUnprinted {
+		if len(toPrint) > 0 {
 			fmt.Fprintln(m.console.Writer())
-			for _, repo := range result.Repositories {
-				if len(repo.PullRequests) > 0 && !hasCompletedActions(repo) {
-					m.console.PrintRepoResult(repo)
-				}
+			for _, repo := range toPrint {
+				m.console.PrintRepoResult(repo)
 			}
 		}
 	}
