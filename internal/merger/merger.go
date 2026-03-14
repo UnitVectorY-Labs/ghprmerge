@@ -119,7 +119,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			}
 		}
 
-		if showProgress && m.shouldStreamScanResults() {
+		if showProgress && (m.shouldStreamScanResults() || hasCompletedActions(repoResult)) {
 			m.scanDisplayLines += m.printRepoResultWithProgress(repoResult, i+1, len(repos), "Scanning")
 		}
 	}
@@ -133,12 +133,20 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 	}
 
 	// In the default human view, print matching repositories after the scan completes.
+	// Repos with completed actions (merge/rebase) were already streamed during the scan
+	// and are excluded to avoid duplicate output.
 	// Confirm mode still needs this fallback when there is nothing to confirm so the
 	// user can see which repos matched and why they were skipped.
 	if m.console != nil && !m.config.JSON && !m.config.Verbose && (!m.config.Confirm || !hasPendingActions(result)) {
-		fmt.Fprintln(m.console.Writer())
+		var toPrint []output.RepositoryResult
 		for _, repo := range result.Repositories {
-			if len(repo.PullRequests) > 0 {
+			if len(repo.PullRequests) > 0 && !hasCompletedActions(repo) {
+				toPrint = append(toPrint, repo)
+			}
+		}
+		if len(toPrint) > 0 {
+			fmt.Fprintln(m.console.Writer())
+			for _, repo := range toPrint {
 				m.console.PrintRepoResult(repo)
 			}
 		}
@@ -206,7 +214,7 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 			m.updateSummary(&scanResult.Summary, *pr)
 		}
 
-		if showProgress && m.config.Verbose && hasCompletedActions(*repo) {
+		if showProgress && hasCompletedActions(*repo) {
 			m.printRepoResultWithProgress(*repo, actionNum, totalActions, "Executing")
 		}
 	}
@@ -216,12 +224,10 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 		m.console.FinishProgress()
 	}
 
-	// Print action results
-	if m.console != nil && !m.config.JSON {
+	// Print action results only when they were not already streamed during execution.
+	// When showProgress is true, results were streamed inline with the progress bar.
+	if m.console != nil && !m.config.JSON && !showProgress {
 		for _, repo := range scanResult.Repositories {
-			if m.config.Verbose {
-				continue
-			}
 			if hasCompletedActions(repo) {
 				m.console.PrintRepoResult(repo)
 			}
