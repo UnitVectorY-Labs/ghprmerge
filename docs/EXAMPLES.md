@@ -142,6 +142,50 @@ ghprmerge --org myorg --source-branch dependabot/ --json | \
   jq -r '.repositories[].pull_requests[] | select(.action == "would merge") | .url'
 ```
 
+## Report Mode
+
+Scan open PRs across the organization and group them by source branch name:
+
+```bash
+ghprmerge --org myorg --report
+```
+
+Filter to specific branch prefixes:
+
+```bash
+ghprmerge --org myorg --report --source-branch-prefix dependabot/,repver/
+```
+
+Require at least 3 PRs in a group:
+
+```bash
+ghprmerge --org myorg --report --min-group-size 3
+```
+
+Get JSON output for scripting:
+
+```bash
+ghprmerge --org myorg --report --json
+```
+
+Show only branch names and counts:
+
+```bash
+ghprmerge --org myorg --report --verbosity brief
+```
+
+Include PR titles in the output:
+
+```bash
+ghprmerge --org myorg --report --verbosity verbose
+```
+
+Scope the report to specific repositories:
+
+```bash
+ghprmerge --org myorg --report --repo repo1 --repo repo2
+```
+
 ## Using Environment Variables
 
 ```bash

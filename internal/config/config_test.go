@@ -332,6 +332,246 @@ func TestIsAnalysisOnly(t *testing.T) {
 	}
 }
 
+func TestConfigValidateReportMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid report config",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with source-branch is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				SourceBranch: "dependabot/",
+				MinGroupSize: 2,
+			},
+			wantErr: true,
+			errMsg:  "--source-branch cannot be used with --report",
+		},
+		{
+			name: "report with rebase is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				Rebase:       true,
+				MinGroupSize: 2,
+			},
+			wantErr: true,
+			errMsg:  "--rebase cannot be used with --report",
+		},
+		{
+			name: "report with merge is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				Merge:        true,
+				MinGroupSize: 2,
+			},
+			wantErr: true,
+			errMsg:  "--merge cannot be used with --report",
+		},
+		{
+			name: "report with skip-rebase is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				SkipRebase:   true,
+				MinGroupSize: 2,
+			},
+			wantErr: true,
+			errMsg:  "--skip-rebase cannot be used with --report",
+		},
+		{
+			name: "report with confirm is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				Confirm:      true,
+				MinGroupSize: 2,
+			},
+			wantErr: true,
+			errMsg:  "--confirm cannot be used with --report",
+		},
+		{
+			name: "report with invalid verbosity",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "invalid",
+			},
+			wantErr: true,
+			errMsg:  "--verbosity must be one of",
+		},
+		{
+			name: "report with valid verbosity brief",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "brief",
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with valid verbosity standard",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "standard",
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with valid verbosity verbose",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "verbose",
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with min-group-size zero",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 0,
+			},
+			wantErr: true,
+			errMsg:  "--min-group-size must be at least 1",
+		},
+		{
+			name: "report with source-branch-prefix",
+			config: Config{
+				Org:                "myorg",
+				Token:              "test-token",
+				Report:             true,
+				MinGroupSize:       2,
+				SourceBranchPrefix: []string{"dependabot/"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "non-report with source-branch-prefix is invalid",
+			config: Config{
+				Org:                "myorg",
+				Token:              "test-token",
+				SourceBranch:       "dependabot/",
+				SourceBranchPrefix: []string{"dependabot/"},
+			},
+			wantErr: true,
+			errMsg:  "--source-branch-prefix can only be used with --report",
+		},
+		{
+			name: "non-report with verbosity is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				SourceBranch: "dependabot/",
+				Verbosity:    "brief",
+			},
+			wantErr: true,
+			errMsg:  "--verbosity can only be used with --report",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil {
+				if !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, want to contain %v", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestParseFlagsReport(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	origOrg := os.Getenv("GITHUB_ORG")
+	defer func() {
+		os.Setenv("GITHUB_TOKEN", origToken)
+		os.Setenv("GITHUB_ORG", origOrg)
+	}()
+
+	os.Setenv("GITHUB_TOKEN", "test-token")
+	os.Setenv("GITHUB_ORG", "")
+
+	// Test basic report flag parsing
+	cfg, err := ParseFlags([]string{"--org", "myorg", "--report"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if !cfg.Report {
+		t.Error("expected Report = true")
+	}
+	if cfg.MinGroupSize != 2 {
+		t.Errorf("expected default MinGroupSize = 2, got %d", cfg.MinGroupSize)
+	}
+
+	// Test report with source-branch-prefix
+	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--source-branch-prefix", "dependabot/,repver/"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if len(cfg.SourceBranchPrefix) != 2 {
+		t.Errorf("expected 2 prefixes, got %d", len(cfg.SourceBranchPrefix))
+	}
+	if cfg.SourceBranchPrefix[0] != "dependabot/" {
+		t.Errorf("expected first prefix = dependabot/, got %s", cfg.SourceBranchPrefix[0])
+	}
+	if cfg.SourceBranchPrefix[1] != "repver/" {
+		t.Errorf("expected second prefix = repver/, got %s", cfg.SourceBranchPrefix[1])
+	}
+
+	// Test report with min-group-size
+	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--min-group-size", "5"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if cfg.MinGroupSize != 5 {
+		t.Errorf("expected MinGroupSize = 5, got %d", cfg.MinGroupSize)
+	}
+
+	// Test report with verbosity
+	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--verbosity", "brief"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if cfg.Verbosity != "brief" {
+		t.Errorf("expected Verbosity = brief, got %s", cfg.Verbosity)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr))
 }

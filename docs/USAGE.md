@@ -15,20 +15,42 @@ ghprmerge [flags]
 
 ## Flags Reference
 
+### Shared Flags
+
+These flags work in both normal mode and report mode.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
+| `--repo` | - | Limit to specific repositories (repeatable) |
+| `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
+| `--json` | `false` | Output structured JSON |
+| `--verbose` | `false` | Stream repository results during scanning, including repos with no matching pull requests |
+| `--no-color` | `false` | Disable colored output |
+| `--version` | - | Show version information and exit |
+
+### Normal Mode Flags
+
+These flags are only valid in normal mode (without `--report`).
+
 | Flag | Default | Mutates State | Description |
 |------|---------|---------------|-------------|
-| `--org` | `GITHUB_ORG` env | No | GitHub organization to scan (required) |
-| `--source-branch` | - | No | Branch pattern to match PR head branches (required) |
+| `--source-branch` | - | No | Branch pattern to match PR head branches (required in normal mode) |
 | `--rebase` | `false` | **Yes** | Update out-of-date branches (mutually exclusive with --merge and --skip-rebase) |
 | `--merge` | `false` | **Yes** | Merge PRs that are in a valid state (mutually exclusive with --rebase) |
 | `--skip-rebase` | `false` | **Yes** | Skip rebase check and merge PRs that are behind (requires --merge, mutually exclusive with --rebase) |
-| `--repo` | - | No | Limit to specific repositories (repeatable) |
-| `--repo-limit` | `0` | No | Maximum repositories to process (0 = unlimited) |
-| `--json` | `false` | No | Output structured JSON |
 | `--confirm` | `false` | No | Scan all repos first, then prompt for confirmation |
-| `--verbose` | `false` | No | Stream repository results during scanning, including repos with no matching pull requests |
-| `--no-color` | `false` | No | Disable colored output |
-| `--version` | - | No | Show version information and exit |
+
+### Report Mode Flags
+
+These flags are only valid when `--report` is used.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--report` | `false` | Report mode: scan open PRs and group by source branch name |
+| `--source-branch-prefix` | - | Comma-separated list of branch prefixes to include in report |
+| `--min-group-size` | `2` | Minimum number of PRs in a group to include in report |
+| `--verbosity` | `standard` | Report output verbosity: `brief`, `standard`, or `verbose` |
 
 ## Environment Variables
 
@@ -97,6 +119,63 @@ ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
 - On confirmation, clears the pending scan/prompt output and streams each action result as it completes, with the progress bar continuing below
 - If no actions are pending, prints the matching repository results and skip reasons instead of prompting
 - Useful for reviewing changes before taking action
+
+### Report Mode
+
+```bash
+ghprmerge --org myorg --report
+```
+
+- Scans all repos using the same discovery logic as normal mode
+- Lists all open PRs (non-draft, targeting default branch)
+- Groups PRs by exact source branch name
+- Filters by prefix if `--source-branch-prefix` is set
+- Filters out groups smaller than `--min-group-size` (default: 2)
+- Sorts by descending count, then ascending branch name for ties
+- Evaluates each PR's status using the same logic as normal mode (check status, branch status)
+- **No mutations performed**
+
+**Flag restrictions**: Normal mode flags (`--source-branch`, `--rebase`, `--merge`, `--skip-rebase`, `--confirm`) cannot be used with `--report`. Report mode flags (`--source-branch-prefix`, `--min-group-size`, `--verbosity`) can only be used with `--report`.
+
+#### Text Output Verbosity
+
+The `--verbosity` flag controls the level of detail in text output:
+
+- **`brief`**: Branch name and PR count only
+- **`standard`** (default): Branch name, count, and for each PR: repo name, PR number, status
+- **`verbose`**: Standard output plus PR title
+
+#### JSON Output
+
+With `--json`, report mode outputs:
+
+```json
+{
+  "groups": [
+    {
+      "sourceBranch": "dependabot/go_modules/foo-1.2.3",
+      "count": 3,
+      "pullRequests": [
+        {
+          "repository": "repo-a",
+          "number": 123,
+          "status": "passing",
+          "title": "Bump foo",
+          "url": "https://github.com/..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Status Values
+
+Status is the same assessment logic as normal ghprmerge: `passing`, `needs-rebase`, `conflict`, `checks failing`, `checks pending`, `no checks configured`, `error`.
+
+#### Empty Results
+
+When no grouped source branches are found, text output shows "No grouped source branches found.", JSON outputs an empty `groups` array, and exit code is 0.
 
 ### Verbose Output
 

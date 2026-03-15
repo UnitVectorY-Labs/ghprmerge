@@ -66,8 +66,37 @@ func run() error {
 	// Create merger with console
 	m := merger.New(client, cfg, console)
 
-	// Run merger
 	ctx := context.Background()
+
+	// Report mode: scan and aggregate PRs by source branch
+	if cfg.Report {
+		return runReport(ctx, m, cfg)
+	}
+
+	// Normal mode: act on a single source branch
+	return runNormal(ctx, m, cfg, console)
+}
+
+// runReport executes report mode.
+func runReport(ctx context.Context, m *merger.Merger, cfg *config.Config) error {
+	result, err := m.RunReport(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Determine verbosity
+	verbosity := cfg.Verbosity
+	if verbosity == "" {
+		verbosity = "standard"
+	}
+
+	writer := output.NewWriter(os.Stdout, cfg.JSON, cfg.NoColor)
+	return writer.WriteReportResult(result, verbosity)
+}
+
+// runNormal executes the normal (non-report) mode.
+func runNormal(ctx context.Context, m *merger.Merger, cfg *config.Config, console *output.Console) error {
+	// Run merger
 	result, err := m.Run(ctx)
 	if err != nil {
 		return err

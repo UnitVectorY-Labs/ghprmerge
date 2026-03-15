@@ -24,18 +24,22 @@ func (s *StringSliceFlag) Set(value string) error {
 
 // Config holds all configuration for ghprmerge.
 type Config struct {
-	Org          string
-	SourceBranch string
-	Rebase       bool
-	Merge        bool
-	SkipRebase   bool
-	Repos        []string
-	RepoLimit    int
-	JSON         bool
-	Confirm      bool
-	Verbose      bool
-	NoColor      bool
-	Token        string
+	Org                string
+	SourceBranch       string
+	Rebase             bool
+	Merge              bool
+	SkipRebase         bool
+	Repos              []string
+	RepoLimit          int
+	JSON               bool
+	Confirm            bool
+	Verbose            bool
+	NoColor            bool
+	Token              string
+	Report             bool
+	SourceBranchPrefix []string
+	MinGroupSize       int
+	Verbosity          string
 }
 
 // IsAnalysisOnly returns true if neither --rebase nor --merge is set.
@@ -48,11 +52,45 @@ func (c *Config) Validate() error {
 	if c.Org == "" {
 		return fmt.Errorf("--org is required (or set GITHUB_ORG environment variable)")
 	}
+	if c.Token == "" {
+		return fmt.Errorf("no GitHub token found: set GITHUB_TOKEN environment variable or authenticate with 'gh auth login'")
+	}
+
+	// Report mode validation
+	if c.Report {
+		if c.SourceBranch != "" {
+			return fmt.Errorf("--source-branch cannot be used with --report; report mode aggregates all matching branches")
+		}
+		if c.Rebase {
+			return fmt.Errorf("--rebase cannot be used with --report; report mode is read-only")
+		}
+		if c.Merge {
+			return fmt.Errorf("--merge cannot be used with --report; report mode is read-only")
+		}
+		if c.SkipRebase {
+			return fmt.Errorf("--skip-rebase cannot be used with --report; report mode is read-only")
+		}
+		if c.Confirm {
+			return fmt.Errorf("--confirm cannot be used with --report; report mode does not perform actions")
+		}
+		if c.MinGroupSize < 1 {
+			return fmt.Errorf("--min-group-size must be at least 1")
+		}
+		if c.Verbosity != "" && c.Verbosity != "brief" && c.Verbosity != "standard" && c.Verbosity != "verbose" {
+			return fmt.Errorf("--verbosity must be one of: brief, standard, verbose")
+		}
+		return nil
+	}
+
+	// Non-report mode validation
 	if c.SourceBranch == "" {
 		return fmt.Errorf("--source-branch is required")
 	}
-	if c.Token == "" {
-		return fmt.Errorf("no GitHub token found: set GITHUB_TOKEN environment variable or authenticate with 'gh auth login'")
+	if len(c.SourceBranchPrefix) > 0 {
+		return fmt.Errorf("--source-branch-prefix can only be used with --report")
+	}
+	if c.Verbosity != "" {
+		return fmt.Errorf("--verbosity can only be used with --report")
 	}
 	// --rebase and --merge are mutually exclusive
 	if c.Rebase && c.Merge {
@@ -92,6 +130,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	verbose := fs.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
 	noColor := fs.Bool("no-color", false, "Disable colored output")
 	showVersion := fs.Bool("version", false, "Show version information and exit")
+	report := fs.Bool("report", false, "Report mode: scan open PRs and group by source branch name")
+	sourceBranchPrefix := fs.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report (report mode only)")
+	minGroupSize := fs.Int("min-group-size", 2, "Minimum number of PRs in a group to include in report (report mode only)")
+	verbosity := fs.String("verbosity", "", "Report output verbosity: brief, standard, or verbose (report mode only, default: standard)")
 
 	fs.Var(&repos, "repo", "Limit execution to specific repositories (may be repeated)")
 
@@ -105,22 +147,37 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		return nil, ErrVersion
 	}
 
+	// Parse source-branch-prefix into a slice
+	var prefixes []string
+	if *sourceBranchPrefix != "" {
+		for _, p := range strings.Split(*sourceBranchPrefix, ",") {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				prefixes = append(prefixes, trimmed)
+			}
+		}
+	}
+
 	// Resolve authentication token
 	token := resolveToken()
 
 	return &Config{
-		Org:          *org,
-		SourceBranch: *sourceBranch,
-		Rebase:       *rebase,
-		Merge:        *merge,
-		SkipRebase:   *skipRebase,
-		Repos:        repos,
-		RepoLimit:    *repoLimit,
-		JSON:         *jsonOutput,
-		Confirm:      *confirm,
-		Verbose:      *verbose,
-		NoColor:      *noColor,
-		Token:        token,
+		Org:                *org,
+		SourceBranch:       *sourceBranch,
+		Rebase:             *rebase,
+		Merge:              *merge,
+		SkipRebase:         *skipRebase,
+		Repos:              repos,
+		RepoLimit:          *repoLimit,
+		JSON:               *jsonOutput,
+		Confirm:            *confirm,
+		Verbose:            *verbose,
+		NoColor:            *noColor,
+		Token:              token,
+		Report:             *report,
+		SourceBranchPrefix: prefixes,
+		MinGroupSize:       *minGroupSize,
+		Verbosity:          *verbosity,
 	}, nil
 }
 
