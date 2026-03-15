@@ -11,6 +11,8 @@ permalink: /
 
 ghprmerge solves the problem of merging many similar pull requests across a GitHub organization. When you have dozens or hundreds of repositories with Dependabot (or similar automated) PRs, manually reviewing and merging each one becomes impractical.
 
+In **report mode** (`--report`), ghprmerge scans open PRs across the organization and groups them by source branch name, helping you identify common updates that span multiple repositories.
+
 ## Safety Model
 
 ghprmerge is designed to be **safe by default**:
@@ -34,6 +36,8 @@ ghprmerge is designed to be **safe by default**:
 
 ## Execution Flow
 
+### Normal Mode
+
 ```
 scan → evaluate → optional rebase → optional merge → report
 ```
@@ -54,6 +58,20 @@ For each repository (processed sequentially):
    - With `--verbose`, stream each repository result as soon as it is known
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
+
+### Report Mode
+
+```
+scan → collect open PRs → group by branch name → filter → sort → display
+```
+
+1. Discover repositories using the same logic as normal mode
+2. Collect all open, non-draft PRs targeting the default branch
+3. Group PRs by exact source branch name
+4. Filter by `--source-branch-prefix` if set
+5. Exclude groups smaller than `--min-group-size` (default: 2)
+6. Sort by descending count, then ascending branch name
+7. Display results according to `--verbosity` level or as JSON with `--json`
 
 ## Contents
 

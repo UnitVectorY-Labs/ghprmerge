@@ -37,6 +37,15 @@ ghprmerge --org myorg --source-branch dependabot/ --verbose
 
 # Disable colored output
 ghprmerge --org myorg --source-branch dependabot/ --no-color
+
+# Report mode: group open PRs by source branch
+ghprmerge --org myorg --report
+
+# Report with prefix filter and JSON output
+ghprmerge --org myorg --report --source-branch-prefix dependabot/ --json
+
+# Report with minimum group size
+ghprmerge --org myorg --report --min-group-size 3
 ```
 
 ## Documentation
