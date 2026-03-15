@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	gh "github.com/UnitVectorY-Labs/ghprmerge/internal/github"
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/output"
@@ -259,9 +258,4 @@ func (m *Merger) evaluateReportBranchStatus(ctx context.Context, owner, repoName
 	}
 
 	return checksState
-}
-
-// ReportStartTime returns a start time for report metadata.
-func ReportStartTime() time.Time {
-	return time.Now()
 }
