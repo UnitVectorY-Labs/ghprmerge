@@ -1,0 +1,12 @@
+name: ghprmerge
+default_branch: main
+config:
+  description: "A command-line tool to automatically evaluate, merge, and optionally rebase GitHub pull requests sharing the same source branch across an organization."
+  license: MIT
+  language: go
+  release: release-go
+  justfile: true
+  codecov: false
+  docs:
+    enabled: true
+    domain: ghprmerge.unitvectorylabs.com
