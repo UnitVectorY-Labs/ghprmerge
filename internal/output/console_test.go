@@ -10,7 +10,7 @@ import (
 
 func TestConsoleColorEnabled(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // color enabled
+	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
 
 	green := c.Green("success")
 	if !strings.Contains(green, "\033[32m") {
@@ -312,7 +312,7 @@ func TestProgressBarComplete(t *testing.T) {
 
 func TestProgressBarColoredPercentage(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // color enabled
+	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
 
 	// Test 100% - should use green for percentage
 	c.ProgressBar(10, 10, "Testing")
@@ -340,7 +340,7 @@ func TestProgressBarColoredPercentage(t *testing.T) {
 
 func TestProgressBarGrayBrackets(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // color enabled
+	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
 
 	c.ProgressBar(5, 10, "Testing")
 	output := buf.String()
@@ -355,7 +355,7 @@ func TestProgressBarGrayBrackets(t *testing.T) {
 
 func TestProgressBarGreenFill(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // color enabled
+	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
 
 	c.ProgressBar(5, 10, "Testing")
 	output := buf.String()

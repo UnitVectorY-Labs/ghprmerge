@@ -102,8 +102,8 @@ func (c *Console) ProgressBar(current, total int, label string) {
 
 	// Calculate bar width based on terminal width.
 	// Layout: "\r" + "  " (2) + label + "  " (2) + counter + " " (1) + "[" (1) + bar + "]" (1) + " " (1) + pct (4)
-	counterWidth := tw + 1 + digitCount(total)
-	fixedWidth := 2 + len(label) + 2 + counterWidth + 1 + 1 + 1 + 1 + 4
+	counterWidth := tw + 1 + digitCount(total)                          // current digits + "/" + total digits
+	fixedWidth := 2 + len(label) + 2 + counterWidth + 1 + 1 + 1 + 1 + 4 // spaces, label, counter, brackets, pct
 	barWidth := defaultTermWidth - fixedWidth
 	if barWidth < minBarWidth {
 		barWidth = minBarWidth
