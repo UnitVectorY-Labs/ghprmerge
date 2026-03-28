@@ -2,8 +2,10 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestConsoleColorEnabled(t *testing.T) {
@@ -55,6 +57,12 @@ func TestConsoleProgressBar(t *testing.T) {
 	}
 	if !strings.HasPrefix(output, "\r") {
 		t.Errorf("Expected carriage return at start, got: %q", output)
+	}
+	if !strings.Contains(output, "[") || !strings.Contains(output, "]") {
+		t.Errorf("Expected brackets in progress bar, got: %q", output)
+	}
+	if !strings.Contains(output, "Testing") {
+		t.Errorf("Expected label in progress bar, got: %q", output)
 	}
 }
 
@@ -225,5 +233,175 @@ func TestConsoleColorActions(t *testing.T) {
 				t.Errorf("getActionSymbol(%v) = %q, want %q", tt.action, got, tt.symbol)
 			}
 		})
+	}
+}
+
+func TestDigitCount(t *testing.T) {
+	tests := []struct {
+		input int
+		want  int
+	}{
+		{0, 1},
+		{1, 1},
+		{9, 1},
+		{10, 2},
+		{99, 2},
+		{100, 3},
+		{999, 3},
+		{1000, 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%d", tt.input), func(t *testing.T) {
+			got := digitCount(tt.input)
+			if got != tt.want {
+				t.Errorf("digitCount(%d) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProgressBarPaddedCounter(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false)
+
+	c.ProgressBar(1, 100, "Scanning")
+	output := buf.String()
+
+	// Counter should be padded: "  1/100"
+	if !strings.Contains(output, "  1/100") {
+		t.Errorf("Expected padded counter '  1/100' in progress bar, got: %q", output)
+	}
+}
+
+func TestProgressBarSmoothBlocks(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false)
+
+	// At 33%, there should be partial blocks in the output
+	c.ProgressBar(1, 3, "Testing")
+	output := buf.String()
+
+	// Should contain at least one of the partial block characters
+	hasPartial := false
+	for _, ch := range "▏▎▍▌▋▊▉" {
+		if strings.ContainsRune(output, ch) {
+			hasPartial = true
+			break
+		}
+	}
+	if !hasPartial && !strings.Contains(output, "█") {
+		t.Errorf("Expected filled or partial blocks in progress bar at 33%%, got: %q", output)
+	}
+}
+
+func TestProgressBarComplete(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false)
+
+	c.ProgressBar(10, 10, "Done")
+	output := buf.String()
+
+	if !strings.Contains(output, "100%") {
+		t.Errorf("Expected '100%%' in completed progress bar, got: %q", output)
+	}
+	if !strings.Contains(output, "10/10") {
+		t.Errorf("Expected '10/10' in completed progress bar, got: %q", output)
+	}
+}
+
+func TestProgressBarColoredPercentage(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, false, false) // color enabled
+
+	// Test 100% - should use green for percentage
+	c.ProgressBar(10, 10, "Testing")
+	output := buf.String()
+	if !strings.Contains(output, colorGreen+"100%") {
+		t.Errorf("Expected green percentage at 100%%, got: %q", output)
+	}
+
+	// Test 70% - should use yellow for percentage
+	buf.Reset()
+	c.ProgressBar(7, 10, "Testing")
+	output = buf.String()
+	if !strings.Contains(output, colorYellow+" 70%") {
+		t.Errorf("Expected yellow percentage at 70%%, got: %q", output)
+	}
+
+	// Test 30% - should use cyan for percentage
+	buf.Reset()
+	c.ProgressBar(3, 10, "Testing")
+	output = buf.String()
+	if !strings.Contains(output, colorCyan+" 30%") {
+		t.Errorf("Expected cyan percentage at 30%%, got: %q", output)
+	}
+}
+
+func TestProgressBarGrayBrackets(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, false, false) // color enabled
+
+	c.ProgressBar(5, 10, "Testing")
+	output := buf.String()
+
+	if !strings.Contains(output, colorGray+"[") {
+		t.Errorf("Expected gray opening bracket, got: %q", output)
+	}
+	if !strings.Contains(output, colorGray+"]") {
+		t.Errorf("Expected gray closing bracket, got: %q", output)
+	}
+}
+
+func TestProgressBarGreenFill(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, false, false) // color enabled
+
+	c.ProgressBar(5, 10, "Testing")
+	output := buf.String()
+
+	if !strings.Contains(output, colorGreen) {
+		t.Errorf("Expected green color in progress bar fill, got: %q", output)
+	}
+}
+
+func TestProgressBarEdgeCases(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false)
+
+	// current > total should clamp
+	c.ProgressBar(15, 10, "Testing")
+	output := buf.String()
+	if !strings.Contains(output, "100%") {
+		t.Errorf("Expected clamped to 100%% when current > total, got: %q", output)
+	}
+
+	// current < 0 should clamp
+	buf.Reset()
+	c.ProgressBar(-5, 10, "Testing")
+	output = buf.String()
+	if !strings.Contains(output, "0%") {
+		t.Errorf("Expected clamped to 0%% when current < 0, got: %q", output)
+	}
+}
+
+func TestProgressBarConsistentWidth(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false)
+
+	// Render at different progress values and verify consistent visible width
+	var widths []int
+	for i := 1; i <= 10; i++ {
+		buf.Reset()
+		c.ProgressBar(i, 10, "Scanning")
+		// Strip the leading \r
+		output := strings.TrimPrefix(buf.String(), "\r")
+		widths = append(widths, utf8.RuneCountInString(output))
+	}
+
+	for i := 1; i < len(widths); i++ {
+		if widths[i] != widths[0] {
+			t.Errorf("Progress bar width inconsistent: step 1 = %d runes, step %d = %d runes", widths[0], i+1, widths[i])
+		}
 	}
 }
