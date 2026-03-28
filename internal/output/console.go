@@ -15,7 +15,19 @@ const (
 	colorGreen  = "\033[32m"
 	colorYellow = "\033[33m"
 	colorCyan   = "\033[36m"
+	colorGray   = "\033[90m"
 )
+
+// Unicode block characters for smooth progress bar rendering (1/8 to 7/8 fill).
+var partialBlocks = [8]string{" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
+
+const fullBlock = "█"
+
+// minBarWidth is the minimum number of character cells for the progress bar.
+const minBarWidth = 10
+
+// defaultTermWidth is the assumed terminal width when detection is not available.
+const defaultTermWidth = 80
 
 // Console handles colored, formatted terminal output with progress bar support.
 type Console struct {
@@ -74,16 +86,84 @@ func (c *Console) ProgressBar(current, total int, label string) {
 	if total == 0 {
 		return
 	}
-	width := 30
-	filled := width * current / total
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+
+	if current < 0 {
+		current = 0
+	}
+	if current > total {
+		current = total
+	}
 
 	pct := 100 * current / total
-	line := fmt.Sprintf("\r%s [%s] %d/%d (%d%%)", label, bar, current, total, pct)
-	if !c.noColor {
-		line = fmt.Sprintf("\r%s [%s%s%s] %d/%d (%d%%)", label, colorCyan, bar, colorReset, current, total, pct)
+
+	// Build the counter string: current is right-padded with spaces to match total width.
+	tw := digitCount(total)
+	counterStr := fmt.Sprintf("%*d/%d", tw, current, total)
+
+	// Calculate bar width based on terminal width.
+	// Layout: "\r" + "  " (2) + label + "  " (2) + counter + " " (1) + "[" (1) + bar + "]" (1) + " " (1) + pct (4)
+	counterWidth := tw + 1 + digitCount(total)                          // current digits + "/" + total digits
+	fixedWidth := 2 + len(label) + 2 + counterWidth + 1 + 1 + 1 + 1 + 4 // spaces, label, counter, brackets, pct
+	barWidth := defaultTermWidth - fixedWidth
+	if barWidth < minBarWidth {
+		barWidth = minBarWidth
 	}
-	fmt.Fprint(c.w, line)
+
+	// Compute filled portion using eighths for smooth partial steps.
+	filledEighths := (current * barWidth * 8) / total
+	fullBlocks := filledEighths / 8
+	partialEighths := filledEighths % 8
+	emptyBlocks := barWidth - fullBlocks
+	if partialEighths > 0 {
+		emptyBlocks--
+	}
+	if emptyBlocks < 0 {
+		emptyBlocks = 0
+	}
+
+	// Build progress bar content.
+	var bar strings.Builder
+	bar.WriteString(strings.Repeat(fullBlock, fullBlocks))
+	if partialEighths > 0 {
+		bar.WriteString(partialBlocks[partialEighths])
+	}
+	bar.WriteString(strings.Repeat(" ", emptyBlocks))
+
+	// Percentage color: green at 100%, yellow at 60%+, cyan otherwise.
+	percentColor := colorCyan
+	if pct >= 100 {
+		percentColor = colorGreen
+	} else if pct >= 60 {
+		percentColor = colorYellow
+	}
+
+	// Assemble the line.
+	var b strings.Builder
+	b.WriteString("\r  ")
+	b.WriteString(c.color(colorCyan, label))
+	b.WriteString("  ")
+	b.WriteString(c.color(colorGray, counterStr))
+	b.WriteString(" ")
+	b.WriteString(c.color(colorGray, "["))
+	b.WriteString(c.color(colorGreen, bar.String()))
+	b.WriteString(c.color(colorGray, "]"))
+	b.WriteString(" ")
+	b.WriteString(c.color(percentColor, fmt.Sprintf("%3d%%", pct)))
+
+	fmt.Fprint(c.w, b.String())
+}
+
+// digitCount returns the number of decimal digits in a non-negative integer.
+func digitCount(n int) int {
+	if n <= 0 {
+		return 1
+	}
+	count := 0
+	for n > 0 {
+		count++
+		n /= 10
+	}
+	return count
 }
 
 // FinishProgress completes the progress bar by adding a newline.
