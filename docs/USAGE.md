@@ -279,7 +279,7 @@ Output uses colored text and Unicode symbols for clear, scannable results:
 
 A progress bar is shown during scanning:
 ```
-Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
+  Scanning  15/25 [█████████████████████████████████                      ]  60%
 ```
 
 In analysis mode (no `--merge` or `--rebase`), after scanning only repositories with matching PRs are shown. Each matching PR is displayed with its action and details:
@@ -292,7 +292,7 @@ When actions are performed (`--merge` or `--rebase`), each result is streamed to
 ```
   ✓ myorg/repo1 #42 Bump lodash to 4.17.21
     merged ─ successfully merged (all checks passing)
-Scanning [██████████████████░░░░░░░░░░░░] 15/25 (60%)
+  Scanning  15/25 [█████████████████████████████████                      ]  60%
 ```
 
 With `--verbose`, repository results are emitted live during scanning, including repositories with no matching pull requests:
