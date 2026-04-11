@@ -41,10 +41,11 @@ func TestMergerAnalysisOnly(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false,
-		Merge:        false, // Analysis only mode
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false,
+		Merge:          false, // Analysis only mode
 	}
 
 	m := New(mock, cfg, nil)
@@ -109,10 +110,11 @@ func TestMergerMergeOnly(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false,
-		Merge:        true, // Merge mode
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false,
+		Merge:          true, // Merge mode
 	}
 
 	m := New(mock, cfg, nil)
@@ -165,9 +167,10 @@ func TestMergerSkipsFailingChecks(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -221,9 +224,10 @@ func TestMergerAllowsMergeWhenNoChecksExist(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -276,10 +280,11 @@ func TestMergerConfirmTreatsNoChecksAsPendingMerge(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
-		Confirm:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
+		Confirm:        true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -335,10 +340,11 @@ func TestMergerSkipsOutdatedBranch(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false, // Rebase disabled
-		Merge:        true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false, // Rebase disabled
+		Merge:          true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -397,9 +403,10 @@ func TestMergerSkipsConflicts(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -452,8 +459,9 @@ func TestMergerSkipsArchivedRepos(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
 	}
 
 	m := New(mock, cfg, nil)
@@ -514,8 +522,9 @@ func TestMergerSkipsDrafts(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
 	}
 
 	m := New(mock, cfg, nil)
@@ -557,9 +566,10 @@ func TestMergerRepoFilter(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Repos:        []string{"repo1", "repo3"}, // Only these repos
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Repos:          []string{"repo1", "repo3"}, // Only these repos
 	}
 
 	m := New(mock, cfg, nil)
@@ -613,9 +623,10 @@ func TestMergerRepoLimit(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		RepoLimit:    2, // Only process 2 repos
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		RepoLimit:      2, // Only process 2 repos
 	}
 
 	m := New(mock, cfg, nil)
@@ -670,8 +681,9 @@ func TestMergerSourceBranchFiltering(t *testing.T) {
 	mock.CheckStatuses["testorg/repo1/sha1"] = &github.CheckStatus{AllPassing: true}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
 	}
 
 	m := New(mock, cfg, nil)
@@ -725,10 +737,11 @@ func TestMergerRebaseOnly(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       true,
-		Merge:        false, // Rebase only, no merge
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         true,
+		Merge:          false, // Rebase only, no merge
 	}
 
 	m := New(mock, cfg, nil)
@@ -786,10 +799,11 @@ func TestMergerConfirmDefaultDoesNotPrintRepoResultsDuringScan(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
-		Confirm:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
+		Confirm:        true,
 	}
 
 	m := New(mock, cfg, output.NewConsole(&buf, true, false))
@@ -838,9 +852,10 @@ func TestMergerVerboseStreamsRepoOutcomesDuringScan(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Verbose:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Verbose:        true,
 	}
 
 	m := New(mock, cfg, output.NewConsole(&buf, true, true))
@@ -892,11 +907,12 @@ func TestMergerRunWithActionsVerbosePrintsCompletedActions(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
-		Confirm:      true,
-		Verbose:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
+		Confirm:        true,
+		Verbose:        true,
 	}
 
 	m := New(mock, cfg, output.NewConsole(&buf, true, true))
@@ -953,10 +969,11 @@ func TestMergerConfirmWithoutPendingActionsPrintsRepoResults(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
-		Confirm:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
+		Confirm:        true,
 	}
 
 	m := New(mock, cfg, output.NewConsole(&buf, true, false))
@@ -1013,11 +1030,12 @@ func TestMergerSkipRebaseWithMerge(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false,
-		Merge:        true,
-		SkipRebase:   true, // Skip rebase and merge anyway
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false,
+		Merge:          true,
+		SkipRebase:     true, // Skip rebase and merge anyway
 	}
 
 	m := New(mock, cfg, nil)
@@ -1088,11 +1106,12 @@ func TestMergerSkipRebaseWithConflict(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false,
-		Merge:        true,
-		SkipRebase:   true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false,
+		Merge:          true,
+		SkipRebase:     true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -1144,11 +1163,12 @@ func TestMergerSkipRebaseWithFailingChecks(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       false,
-		Merge:        true,
-		SkipRebase:   true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         false,
+		Merge:          true,
+		SkipRebase:     true,
 	}
 
 	m := New(mock, cfg, nil)
@@ -1207,10 +1227,11 @@ func TestMergerRebaseWithFailingChecks(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       true,
-		Merge:        false, // Rebase only, no merge
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         true,
+		Merge:          false, // Rebase only, no merge
 	}
 
 	m := New(mock, cfg, nil)
@@ -1268,9 +1289,10 @@ func TestMergerMergeModeStreamsActionResultsDuringScan(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
 	}
 
 	m := New(mock, cfg, output.NewConsole(&buf, true, false))
@@ -1328,10 +1350,11 @@ func TestMergerRunWithActionsStreamsDuringExecution(t *testing.T) {
 
 	var buf bytes.Buffer
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Merge:        true,
-		Confirm:      true,
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Merge:          true,
+		Confirm:        true,
 	}
 
 	// Non-verbose confirm mode: scan first, then execute
@@ -1402,10 +1425,11 @@ func TestMergerRebaseWithPendingChecks(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Org:          "testorg",
-		SourceBranch: "dependabot/",
-		Rebase:       true,
-		Merge:        false, // Rebase only, no merge
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/"},
+		Rebase:         true,
+		Merge:          false, // Rebase only, no merge
 	}
 
 	m := New(mock, cfg, nil)
@@ -1428,5 +1452,237 @@ func TestMergerRebaseWithPendingChecks(t *testing.T) {
 	}
 	if result.Repositories[0].PullRequests[0].Action != output.ActionRebased {
 		t.Errorf("Action = %v, want %v", result.Repositories[0].PullRequests[0].Action, output.ActionRebased)
+	}
+}
+
+func TestMergerMultipleSourceBranches(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo-a",
+			FullName:      "testorg/repo-a",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+		{
+			Name:          "repo-b",
+			FullName:      "testorg/repo-b",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+		{
+			Name:          "repo-c",
+			FullName:      "testorg/repo-c",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	// repo-a has PRs matching both patterns
+	mock.PullRequests["testorg/repo-a"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo-a/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-a1",
+			RepoName:   "repo-a",
+		},
+		{
+			Number:     2,
+			Title:      "Repver update",
+			URL:        "https://github.com/testorg/repo-a/pull/2",
+			HeadBranch: "repver/update-1.0",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-a2",
+			RepoName:   "repo-a",
+		},
+	}
+	// repo-b has PR matching first pattern only
+	mock.PullRequests["testorg/repo-b"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Bump lodash",
+			URL:        "https://github.com/testorg/repo-b/pull/1",
+			HeadBranch: "dependabot/npm/lodash",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-b1",
+			RepoName:   "repo-b",
+		},
+	}
+	// repo-c has PR matching second pattern only
+	mock.PullRequests["testorg/repo-c"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Repver update",
+			URL:        "https://github.com/testorg/repo-c/pull/1",
+			HeadBranch: "repver/update-1.0",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-c1",
+			RepoName:   "repo-c",
+		},
+	}
+
+	// Set up check statuses for all PRs
+	mock.CheckStatuses["testorg/repo-a/sha-a1"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+	mock.CheckStatuses["testorg/repo-a/sha-a2"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+	mock.CheckStatuses["testorg/repo-b/sha-b1"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+	mock.CheckStatuses["testorg/repo-c/sha-c1"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+
+	cfg := &config.Config{
+		Org:            "testorg",
+		SourceBranch:   "dependabot/",
+		SourceBranches: []string{"dependabot/", "repver/"},
+		Merge:          true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// repo-a should only have the dependabot PR (first matching pattern wins;
+	// "repver/" is silently skipped because "dependabot/" matched first)
+	var repoA, repoB, repoC *output.RepositoryResult
+	for i := range result.Repositories {
+		switch result.Repositories[i].Name {
+		case "repo-a":
+			repoA = &result.Repositories[i]
+		case "repo-b":
+			repoB = &result.Repositories[i]
+		case "repo-c":
+			repoC = &result.Repositories[i]
+		}
+	}
+
+	if repoA == nil {
+		t.Fatal("repo-a not found in results")
+	}
+	if len(repoA.PullRequests) != 1 {
+		t.Fatalf("repo-a: expected 1 PR (first pattern only), got %d", len(repoA.PullRequests))
+	}
+	if repoA.PullRequests[0].HeadBranch != "dependabot/npm/lodash" {
+		t.Errorf("repo-a: expected PR from dependabot/ pattern, got head branch %q", repoA.PullRequests[0].HeadBranch)
+	}
+
+	// repo-b should have the dependabot PR
+	if repoB == nil {
+		t.Fatal("repo-b not found in results")
+	}
+	if len(repoB.PullRequests) != 1 {
+		t.Fatalf("repo-b: expected 1 PR, got %d", len(repoB.PullRequests))
+	}
+	if repoB.PullRequests[0].HeadBranch != "dependabot/npm/lodash" {
+		t.Errorf("repo-b: expected dependabot PR, got head branch %q", repoB.PullRequests[0].HeadBranch)
+	}
+
+	// repo-c should have the repver PR
+	if repoC == nil {
+		t.Fatal("repo-c not found in results")
+	}
+	if len(repoC.PullRequests) != 1 {
+		t.Fatalf("repo-c: expected 1 PR, got %d", len(repoC.PullRequests))
+	}
+	if repoC.PullRequests[0].HeadBranch != "repver/update-1.0" {
+		t.Errorf("repo-c: expected repver PR, got head branch %q", repoC.PullRequests[0].HeadBranch)
+	}
+
+	// Total candidates: 3 (repo-a gets 1, repo-b gets 1, repo-c gets 1)
+	// repo-a's repver PR is filtered out by discoverPullRequests
+	if result.Summary.CandidatesFound != 3 {
+		t.Errorf("CandidatesFound = %d, want 3", result.Summary.CandidatesFound)
+	}
+
+	// All 3 should be merged
+	if result.Summary.MergedSuccess != 3 {
+		t.Errorf("MergedSuccess = %d, want 3", result.Summary.MergedSuccess)
+	}
+}
+
+func TestMergerMultipleSourceBranchesConcurrentSkip(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{
+		{
+			Name:          "repo-a",
+			FullName:      "testorg/repo-a",
+			DefaultBranch: "main",
+			Archived:      false,
+		},
+	}
+	// repo-a has PRs matching two different patterns
+	mock.PullRequests["testorg/repo-a"] = []github.PullRequest{
+		{
+			Number:     1,
+			Title:      "Pattern A update",
+			URL:        "https://github.com/testorg/repo-a/pull/1",
+			HeadBranch: "pattern-a/update-1",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-pa1",
+			RepoName:   "repo-a",
+		},
+		{
+			Number:     2,
+			Title:      "Pattern B update",
+			URL:        "https://github.com/testorg/repo-a/pull/2",
+			HeadBranch: "pattern-b/update-1",
+			BaseBranch: "main",
+			State:      "open",
+			Draft:      false,
+			HeadSHA:    "sha-pb1",
+			RepoName:   "repo-a",
+		},
+	}
+
+	mock.CheckStatuses["testorg/repo-a/sha-pa1"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+	mock.CheckStatuses["testorg/repo-a/sha-pb1"] = &github.CheckStatus{AllPassing: true, Details: "all checks passing"}
+
+	cfg := &config.Config{
+		Org:            "testorg",
+		SourceBranch:   "pattern-a/",
+		SourceBranches: []string{"pattern-a/", "pattern-b/"},
+		Merge:          true,
+	}
+
+	m := New(mock, cfg, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Only the PR matching "pattern-a/" should be discovered; "pattern-b/" is
+	// silently skipped because a different pattern already matched this repo.
+	if len(result.Repositories) != 1 {
+		t.Fatalf("Expected 1 repository, got %d", len(result.Repositories))
+	}
+
+	repo := result.Repositories[0]
+	if len(repo.PullRequests) != 1 {
+		t.Fatalf("Expected 1 PR (pattern-a/ only), got %d", len(repo.PullRequests))
+	}
+	if repo.PullRequests[0].HeadBranch != "pattern-a/update-1" {
+		t.Errorf("Expected PR from pattern-a/, got head branch %q", repo.PullRequests[0].HeadBranch)
+	}
+	if repo.PullRequests[0].Number != 1 {
+		t.Errorf("Expected PR #1, got #%d", repo.PullRequests[0].Number)
+	}
+
+	// The pattern-b/ PR should not appear in results at all
+	if result.Summary.CandidatesFound != 1 {
+		t.Errorf("CandidatesFound = %d, want 1 (pattern-b/ PR should be filtered out)", result.Summary.CandidatesFound)
+	}
+
+	if result.Summary.MergedSuccess != 1 {
+		t.Errorf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
 	}
 }
