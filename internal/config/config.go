@@ -22,10 +22,21 @@ func (s *StringSliceFlag) Set(value string) error {
 	return nil
 }
 
+// Command represents the subcommand to execute.
+type Command string
+
+const (
+	CommandNone   Command = ""
+	CommandMerge  Command = "merge"
+	CommandRebase Command = "rebase"
+	CommandReport Command = "report"
+)
+
 // Config holds all configuration for ghprmerge.
 type Config struct {
 	Org                string
-	SourceBranch       string
+	SourceBranches     []string
+	SourceBranch       string // First source branch (for backward compat in merger)
 	Rebase             bool
 	Merge              bool
 	SkipRebase         bool
@@ -40,9 +51,10 @@ type Config struct {
 	SourceBranchPrefix []string
 	MinGroupSize       int
 	Verbosity          string
+	Command            Command
 }
 
-// IsAnalysisOnly returns true if neither --rebase nor --merge is set.
+// IsAnalysisOnly returns true if neither rebase nor merge subcommand is used.
 func (c *Config) IsAnalysisOnly() bool {
 	return !c.Rebase && !c.Merge
 }
@@ -58,20 +70,14 @@ func (c *Config) Validate() error {
 
 	// Report mode validation
 	if c.Report {
-		if c.SourceBranch != "" {
-			return fmt.Errorf("--source-branch cannot be used with --report; report mode aggregates all matching branches")
-		}
-		if c.Rebase {
-			return fmt.Errorf("--rebase cannot be used with --report; report mode is read-only")
-		}
-		if c.Merge {
-			return fmt.Errorf("--merge cannot be used with --report; report mode is read-only")
+		if len(c.SourceBranches) > 0 {
+			return fmt.Errorf("--source-branch cannot be used with the report command; report mode aggregates all matching branches")
 		}
 		if c.SkipRebase {
-			return fmt.Errorf("--skip-rebase cannot be used with --report; report mode is read-only")
+			return fmt.Errorf("--skip-rebase cannot be used with the report command; report mode is read-only")
 		}
 		if c.Confirm {
-			return fmt.Errorf("--confirm cannot be used with --report; report mode does not perform actions")
+			return fmt.Errorf("--confirm cannot be used with the report command; report mode does not perform actions")
 		}
 		if c.MinGroupSize < 1 {
 			return fmt.Errorf("--min-group-size must be at least 1")
@@ -83,26 +89,22 @@ func (c *Config) Validate() error {
 	}
 
 	// Non-report mode validation
-	if c.SourceBranch == "" {
+	if len(c.SourceBranches) == 0 {
 		return fmt.Errorf("--source-branch is required")
 	}
 	if len(c.SourceBranchPrefix) > 0 {
-		return fmt.Errorf("--source-branch-prefix can only be used with --report")
+		return fmt.Errorf("--source-branch-prefix can only be used with the report command")
 	}
 	if c.Verbosity != "" {
-		return fmt.Errorf("--verbosity can only be used with --report")
+		return fmt.Errorf("--verbosity can only be used with the report command")
 	}
-	// --rebase and --merge are mutually exclusive
-	if c.Rebase && c.Merge {
-		return fmt.Errorf("--rebase and --merge are mutually exclusive; use --rebase first to update branches, then --merge after checks pass")
-	}
-	// --skip-rebase and --rebase are mutually exclusive
-	if c.SkipRebase && c.Rebase {
-		return fmt.Errorf("--skip-rebase and --rebase are mutually exclusive; --skip-rebase skips rebasing entirely, while --rebase updates branches")
-	}
-	// --skip-rebase requires --merge
+	// --skip-rebase requires merge subcommand
 	if c.SkipRebase && !c.Merge {
-		return fmt.Errorf("--skip-rebase requires --merge; it allows merging PRs without requiring the branch to be up-to-date")
+		return fmt.Errorf("--skip-rebase requires the merge command; it allows merging PRs without requiring the branch to be up-to-date")
+	}
+	// --skip-rebase is invalid in rebase mode
+	if c.SkipRebase && c.Rebase {
+		return fmt.Errorf("--skip-rebase cannot be used with the rebase command")
 	}
 	return nil
 }
@@ -114,30 +116,57 @@ var ErrHelp = flag.ErrHelp
 var ErrVersion = errors.New("version requested")
 
 // ParseFlags parses command-line flags and environment variables.
+// Supports subcommands: merge, rebase, report
+// Usage: ghprmerge [global-flags] <command> [command-flags]
 func ParseFlags(args []string, version string) (*Config, error) {
-	fs := flag.NewFlagSet("ghprmerge", flag.ContinueOnError)
+	if len(args) > 0 {
+		// Check for --version or --help before subcommand parsing
+		for _, arg := range args {
+			if arg == "--version" || arg == "-version" {
+				fmt.Printf("ghprmerge version %s\n", version)
+				return nil, ErrVersion
+			}
+		}
+	}
 
-	var repos StringSliceFlag
+	// Detect subcommand
+	var command Command
+	var subArgs []string
+	globalArgs := make([]string, 0, len(args))
 
-	org := fs.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
-	sourceBranch := fs.String("source-branch", "", "Branch name pattern to match pull request head branches")
-	rebase := fs.Bool("rebase", false, "Update out-of-date branches (mutually exclusive with --merge and --skip-rebase)")
-	merge := fs.Bool("merge", false, "Merge pull requests that are in a valid state (mutually exclusive with --rebase)")
-	skipRebase := fs.Bool("skip-rebase", false, "Skip rebase check and merge PRs that are behind (requires --merge, mutually exclusive with --rebase)")
-	repoLimit := fs.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
-	jsonOutput := fs.Bool("json", false, "Output structured JSON instead of human-readable text")
-	confirm := fs.Bool("confirm", false, "Scan all repos first, then prompt for confirmation before taking actions")
-	verbose := fs.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
-	noColor := fs.Bool("no-color", false, "Disable colored output")
-	showVersion := fs.Bool("version", false, "Show version information and exit")
-	report := fs.Bool("report", false, "Report mode: scan open PRs and group by source branch name")
-	sourceBranchPrefix := fs.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report (report mode only)")
-	minGroupSize := fs.Int("min-group-size", 2, "Minimum number of PRs in a group to include in report (report mode only)")
-	verbosity := fs.String("verbosity", "", "Report output verbosity: brief, standard, or verbose (report mode only, default: standard)")
+	// Find the subcommand position
+	subCmdIdx := -1
+	for i, arg := range args {
+		switch arg {
+		case "merge", "rebase", "report":
+			command = Command(arg)
+			subCmdIdx = i
+		}
+		if subCmdIdx >= 0 {
+			break
+		}
+	}
 
-	fs.Var(&repos, "repo", "Limit execution to specific repositories (may be repeated)")
+	if subCmdIdx >= 0 {
+		globalArgs = args[:subCmdIdx]
+		subArgs = args[subCmdIdx+1:]
+	} else {
+		globalArgs = args
+	}
 
-	if err := fs.Parse(args); err != nil {
+	// Parse global flags
+	globalFS := flag.NewFlagSet("ghprmerge", flag.ContinueOnError)
+	org := globalFS.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
+	repoLimit := globalFS.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
+	jsonOutput := globalFS.Bool("json", false, "Output structured JSON instead of human-readable text")
+	verbose := globalFS.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
+	noColor := globalFS.Bool("no-color", false, "Disable colored output")
+	showVersion := globalFS.Bool("version", false, "Show version information and exit")
+
+	var globalRepos StringSliceFlag
+	globalFS.Var(&globalRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+
+	if err := globalFS.Parse(globalArgs); err != nil {
 		return nil, err
 	}
 
@@ -147,10 +176,61 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		return nil, ErrVersion
 	}
 
+	// Parse subcommand-specific flags
+	var sourceBranches StringSliceFlag
+	var skipRebase bool
+	var confirm bool
+	var sourceBranchPrefixStr string
+	var minGroupSize int
+	var verbosity string
+
+	// Additional repos from subcommand flags
+	var subRepos StringSliceFlag
+
+	if command != CommandNone {
+		subFS := flag.NewFlagSet(string(command), flag.ContinueOnError)
+
+		switch command {
+		case CommandMerge:
+			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
+			subFS.BoolVar(&skipRebase, "skip-rebase", false, "Skip rebase check and merge PRs that are behind")
+			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
+			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+		case CommandRebase:
+			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
+			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
+			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+		case CommandReport:
+			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
+			subFS.Int("min-group-size", 2, "Minimum number of PRs in a group to include in report")
+			subFS.String("verbosity", "", "Report output verbosity: brief, standard, or verbose")
+			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+		}
+
+		if err := subFS.Parse(subArgs); err != nil {
+			return nil, err
+		}
+
+		// Extract report-specific parsed values
+		if command == CommandReport {
+			if f := subFS.Lookup("source-branch-prefix"); f != nil {
+				sourceBranchPrefixStr = f.Value.String()
+			}
+			if f := subFS.Lookup("min-group-size"); f != nil {
+				fmt.Sscanf(f.Value.String(), "%d", &minGroupSize)
+			} else {
+				minGroupSize = 2
+			}
+			if f := subFS.Lookup("verbosity"); f != nil {
+				verbosity = f.Value.String()
+			}
+		}
+	}
+
 	// Parse source-branch-prefix into a slice
 	var prefixes []string
-	if *sourceBranchPrefix != "" {
-		for _, p := range strings.Split(*sourceBranchPrefix, ",") {
+	if sourceBranchPrefixStr != "" {
+		for _, p := range strings.Split(sourceBranchPrefixStr, ",") {
 			trimmed := strings.TrimSpace(p)
 			if trimmed != "" {
 				prefixes = append(prefixes, trimmed)
@@ -158,26 +238,38 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		}
 	}
 
+	// Merge repos from global and subcommand
+	allRepos := append([]string(nil), globalRepos...)
+	allRepos = append(allRepos, subRepos...)
+
 	// Resolve authentication token
 	token := resolveToken()
 
+	// Set sourceBranch for backward compatibility
+	var sourceBranch string
+	if len(sourceBranches) > 0 {
+		sourceBranch = sourceBranches[0]
+	}
+
 	return &Config{
 		Org:                *org,
-		SourceBranch:       *sourceBranch,
-		Rebase:             *rebase,
-		Merge:              *merge,
-		SkipRebase:         *skipRebase,
-		Repos:              repos,
+		SourceBranches:     sourceBranches,
+		SourceBranch:       sourceBranch,
+		Rebase:             command == CommandRebase,
+		Merge:              command == CommandMerge,
+		SkipRebase:         skipRebase,
+		Repos:              allRepos,
 		RepoLimit:          *repoLimit,
 		JSON:               *jsonOutput,
-		Confirm:            *confirm,
+		Confirm:            confirm,
 		Verbose:            *verbose,
 		NoColor:            *noColor,
 		Token:              token,
-		Report:             *report,
+		Report:             command == CommandReport,
 		SourceBranchPrefix: prefixes,
-		MinGroupSize:       *minGroupSize,
-		Verbosity:          *verbosity,
+		MinGroupSize:       minGroupSize,
+		Verbosity:          verbosity,
+		Command:            command,
 	}, nil
 }
 

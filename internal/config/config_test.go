@@ -1,12 +1,12 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"testing"
 )
 
 func TestParseFlags(t *testing.T) {
-	// Save original env
 	origToken := os.Getenv("GITHUB_TOKEN")
 	origOrg := os.Getenv("GITHUB_ORG")
 	defer func() {
@@ -15,102 +15,166 @@ func TestParseFlags(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name           string
-		args           []string
-		envToken       string
-		envOrg         string
-		wantOrg        string
-		wantBranch     string
-		wantRebase     bool
-		wantMerge      bool
-		wantSkipRebase bool
-		wantRepoLimit  int
-		wantJSON       bool
-		wantVerbose    bool
-		wantNoColor    bool
-		wantRepos      []string
-		wantErr        bool
+		name             string
+		args             []string
+		envToken         string
+		envOrg           string
+		wantOrg          string
+		wantBranch       string
+		wantBranches     []string
+		wantRebase       bool
+		wantMerge        bool
+		wantSkipRebase   bool
+		wantRepoLimit    int
+		wantJSON         bool
+		wantVerbose      bool
+		wantNoColor      bool
+		wantConfirm      bool
+		wantRepos        []string
+		wantReport       bool
+		wantCommand      Command
+		wantErr          bool
 	}{
 		{
-			name:          "rebase with json and limit",
-			args:          []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase", "--repo-limit", "10", "--json"},
+			name:          "rebase subcommand with json and limit",
+			args:          []string{"--org", "myorg", "--repo-limit", "10", "--json", "rebase", "--source-branch", "dependabot/"},
 			envToken:      "test-token",
 			wantOrg:       "myorg",
 			wantBranch:    "dependabot/",
+			wantBranches:  []string{"dependabot/"},
 			wantRebase:    true,
 			wantMerge:     false,
 			wantRepoLimit: 10,
 			wantJSON:      true,
+			wantCommand:   CommandRebase,
 		},
 		{
-			name:          "defaults applied",
-			args:          []string{"--org", "myorg", "--source-branch", "dependabot/"},
-			envToken:      "test-token",
-			wantOrg:       "myorg",
-			wantBranch:    "dependabot/",
-			wantRebase:    false,
-			wantMerge:     false,
-			wantRepoLimit: 0,
-			wantJSON:      false,
+			name:        "no subcommand defaults",
+			args:        []string{"--org", "myorg"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantRebase:  false,
+			wantMerge:   false,
+			wantReport:  false,
+			wantCommand: CommandNone,
 		},
 		{
 			name:       "org from env",
-			args:       []string{"--source-branch", "dependabot/"},
+			args:       []string{"merge", "--source-branch", "dependabot/"},
 			envToken:   "test-token",
 			envOrg:     "envorg",
 			wantOrg:    "envorg",
 			wantBranch: "dependabot/",
+			wantMerge:  true,
+			wantCommand: CommandMerge,
 		},
 		{
-			name:       "multiple repos",
-			args:       []string{"--org", "myorg", "--source-branch", "test", "--repo", "repo1", "--repo", "repo2"},
+			name:       "multiple global repos",
+			args:       []string{"--org", "myorg", "--repo", "repo1", "--repo", "repo2", "merge", "--source-branch", "test"},
 			envToken:   "test-token",
 			wantOrg:    "myorg",
 			wantBranch: "test",
 			wantRepos:  []string{"repo1", "repo2"},
-		},
-		{
-			name:       "rebase only",
-			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--rebase"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "dependabot/",
-			wantRebase: true,
-			wantMerge:  false,
-		},
-		{
-			name:       "merge only",
-			args:       []string{"--org", "myorg", "--source-branch", "dependabot/", "--merge"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "dependabot/",
-			wantRebase: false,
 			wantMerge:  true,
+			wantCommand: CommandMerge,
 		},
 		{
-			name:           "skip-rebase with merge",
-			args:           []string{"--org", "myorg", "--source-branch", "dependabot/", "--skip-rebase", "--merge"},
+			name:       "repos from both global and subcommand",
+			args:       []string{"--org", "myorg", "--repo", "repo1", "merge", "--source-branch", "test", "--repo", "repo2"},
+			envToken:   "test-token",
+			wantOrg:    "myorg",
+			wantBranch: "test",
+			wantRepos:  []string{"repo1", "repo2"},
+			wantMerge:  true,
+			wantCommand: CommandMerge,
+		},
+		{
+			name:        "rebase subcommand",
+			args:        []string{"--org", "myorg", "rebase", "--source-branch", "dependabot/"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantRebase:  true,
+			wantMerge:   false,
+			wantCommand: CommandRebase,
+		},
+		{
+			name:        "merge subcommand",
+			args:        []string{"--org", "myorg", "merge", "--source-branch", "dependabot/"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantRebase:  false,
+			wantMerge:   true,
+			wantCommand: CommandMerge,
+		},
+		{
+			name:           "merge subcommand with skip-rebase",
+			args:           []string{"--org", "myorg", "merge", "--source-branch", "dependabot/", "--skip-rebase"},
 			envToken:       "test-token",
 			wantOrg:        "myorg",
 			wantBranch:     "dependabot/",
 			wantMerge:      true,
 			wantSkipRebase: true,
+			wantCommand:    CommandMerge,
 		},
 		{
-			name:        "verbose mode",
-			args:        []string{"--org", "myorg", "--source-branch", "dependabot/", "--verbose"},
+			name:        "verbose global flag",
+			args:        []string{"--org", "myorg", "--verbose", "merge", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
 			wantVerbose: true,
+			wantMerge:   true,
+			wantCommand: CommandMerge,
 		},
 		{
-			name:        "no-color mode",
-			args:        []string{"--org", "myorg", "--source-branch", "dependabot/", "--no-color"},
+			name:        "no-color global flag",
+			args:        []string{"--org", "myorg", "--no-color", "rebase", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
 			wantNoColor: true,
+			wantRebase:  true,
+			wantCommand: CommandRebase,
+		},
+		{
+			name:         "multiple source-branch flags",
+			args:         []string{"--org", "myorg", "merge", "--source-branch", "dep/", "--source-branch", "repver/"},
+			envToken:     "test-token",
+			wantOrg:      "myorg",
+			wantBranch:   "dep/",
+			wantBranches: []string{"dep/", "repver/"},
+			wantMerge:    true,
+			wantCommand:  CommandMerge,
+		},
+		{
+			name:        "confirm flag under merge",
+			args:        []string{"--org", "myorg", "merge", "--source-branch", "dependabot/", "--confirm"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantMerge:   true,
+			wantConfirm: true,
+			wantCommand: CommandMerge,
+		},
+		{
+			name:        "confirm flag under rebase",
+			args:        []string{"--org", "myorg", "rebase", "--source-branch", "dependabot/", "--confirm"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "dependabot/",
+			wantRebase:  true,
+			wantConfirm: true,
+			wantCommand: CommandRebase,
+		},
+		{
+			name:        "report subcommand",
+			args:        []string{"--org", "myorg", "report"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantReport:  true,
+			wantCommand: CommandReport,
 		},
 	}
 
@@ -154,21 +218,76 @@ func TestParseFlags(t *testing.T) {
 			if cfg.NoColor != tt.wantNoColor {
 				t.Errorf("NoColor = %v, want %v", cfg.NoColor, tt.wantNoColor)
 			}
+			if cfg.Confirm != tt.wantConfirm {
+				t.Errorf("Confirm = %v, want %v", cfg.Confirm, tt.wantConfirm)
+			}
+			if cfg.Report != tt.wantReport {
+				t.Errorf("Report = %v, want %v", cfg.Report, tt.wantReport)
+			}
+			if cfg.Command != tt.wantCommand {
+				t.Errorf("Command = %v, want %v", cfg.Command, tt.wantCommand)
+			}
 			if len(tt.wantRepos) > 0 {
 				if len(cfg.Repos) != len(tt.wantRepos) {
 					t.Errorf("Repos = %v, want %v", cfg.Repos, tt.wantRepos)
+				} else {
+					for i, r := range tt.wantRepos {
+						if cfg.Repos[i] != r {
+							t.Errorf("Repos[%d] = %v, want %v", i, cfg.Repos[i], r)
+						}
+					}
+				}
+			}
+			if len(tt.wantBranches) > 0 {
+				if len(cfg.SourceBranches) != len(tt.wantBranches) {
+					t.Errorf("SourceBranches = %v, want %v", cfg.SourceBranches, tt.wantBranches)
+				} else {
+					for i, b := range tt.wantBranches {
+						if cfg.SourceBranches[i] != b {
+							t.Errorf("SourceBranches[%d] = %v, want %v", i, cfg.SourceBranches[i], b)
+						}
+					}
 				}
 			}
 		})
 	}
 }
 
-func TestParseFlagsRejectsQuiet(t *testing.T) {
+func TestParseFlagsVersion(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
 	os.Setenv("GITHUB_TOKEN", "test-token")
-	defer os.Unsetenv("GITHUB_TOKEN")
 
-	if _, err := ParseFlags([]string{"--org", "myorg", "--source-branch", "dependabot/", "--quiet"}, "test"); err == nil {
-		t.Fatal("ParseFlags() expected error for removed --quiet flag")
+	_, err := ParseFlags([]string{"--version"}, "1.0.0")
+	if !errors.Is(err, ErrVersion) {
+		t.Fatalf("ParseFlags(--version) error = %v, want ErrVersion", err)
+	}
+
+	// Version flag anywhere in args
+	_, err = ParseFlags([]string{"--org", "myorg", "--version"}, "1.0.0")
+	if !errors.Is(err, ErrVersion) {
+		t.Fatalf("ParseFlags(--org myorg --version) error = %v, want ErrVersion", err)
+	}
+}
+
+func TestParseFlagsRejectsUnknownGlobalFlag(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
+
+	if _, err := ParseFlags([]string{"--org", "myorg", "--quiet", "merge", "--source-branch", "dependabot/"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected error for unknown --quiet flag")
+	}
+}
+
+func TestParseFlagsRejectsUnknownSubcommandFlag(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
+
+	// --skip-rebase is not valid under rebase subcommand
+	if _, err := ParseFlags([]string{"--org", "myorg", "rebase", "--source-branch", "dep/", "--skip-rebase"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected error for --skip-rebase under rebase subcommand")
 	}
 }
 
@@ -180,45 +299,76 @@ func TestConfigValidate(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid config",
+			name: "valid analysis-only config",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid config with rebase",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
-				Rebase:       true,
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				Rebase:         true,
+				Command:        CommandRebase,
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid config with merge",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
-				Merge:        true,
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				Merge:          true,
+				Command:        CommandMerge,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with merge and skip-rebase",
+			config: Config{
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				Merge:          true,
+				SkipRebase:     true,
+				Command:        CommandMerge,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with multiple source branches",
+			config: Config{
+				Org:            "myorg",
+				SourceBranches: []string{"dep/", "repver/"},
+				SourceBranch:   "dep/",
+				Token:          "test-token",
+				Merge:          true,
+				Command:        CommandMerge,
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing org",
 			config: Config{
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
 			},
 			wantErr: true,
 			errMsg:  "--org is required",
 		},
 		{
-			name: "missing source branch",
+			name: "missing source branch in non-report mode",
 			config: Config{
 				Org:   "myorg",
 				Token: "test-token",
@@ -229,58 +379,211 @@ func TestConfigValidate(t *testing.T) {
 		{
 			name: "missing token",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
 			},
 			wantErr: true,
 			errMsg:  "no GitHub token found",
 		},
 		{
-			name: "rebase and merge mutually exclusive",
+			name: "skip-rebase requires merge command",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
-				Rebase:       true,
-				Merge:        true,
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				SkipRebase:     true,
+				Merge:          false,
 			},
 			wantErr: true,
-			errMsg:  "mutually exclusive",
+			errMsg:  "--skip-rebase requires the merge command",
 		},
 		{
-			name: "valid config with skip-rebase and merge",
+			name: "skip-rebase cannot be used with rebase command",
+			config: Config{
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				SkipRebase:     true,
+				Rebase:         true,
+				Merge:          true,
+				Command:        CommandRebase,
+			},
+			wantErr: true,
+			errMsg:  "--skip-rebase cannot be used with the rebase command",
+		},
+		{
+			name: "source-branch-prefix only valid with report",
+			config: Config{
+				Org:                "myorg",
+				SourceBranches:     []string{"dependabot/"},
+				SourceBranch:       "dependabot/",
+				Token:              "test-token",
+				SourceBranchPrefix: []string{"dependabot/"},
+			},
+			wantErr: true,
+			errMsg:  "--source-branch-prefix can only be used with the report command",
+		},
+		{
+			name: "verbosity only valid with report",
+			config: Config{
+				Org:            "myorg",
+				SourceBranches: []string{"dependabot/"},
+				SourceBranch:   "dependabot/",
+				Token:          "test-token",
+				Verbosity:      "brief",
+			},
+			wantErr: true,
+			errMsg:  "--verbosity can only be used with the report command",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil {
+				if !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, want to contain %v", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestConfigValidateReportMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid report config",
 			config: Config{
 				Org:          "myorg",
-				SourceBranch: "dependabot/",
 				Token:        "test-token",
-				SkipRebase:   true,
-				Merge:        true,
+				Report:       true,
+				MinGroupSize: 2,
+				Command:      CommandReport,
 			},
 			wantErr: false,
 		},
 		{
-			name: "skip-rebase and rebase mutually exclusive",
+			name: "report with source-branches is invalid",
 			config: Config{
-				Org:          "myorg",
-				SourceBranch: "dependabot/",
-				Token:        "test-token",
-				SkipRebase:   true,
-				Rebase:       true,
+				Org:            "myorg",
+				Token:          "test-token",
+				Report:         true,
+				SourceBranches: []string{"dependabot/"},
+				MinGroupSize:   2,
+				Command:        CommandReport,
 			},
 			wantErr: true,
-			errMsg:  "--skip-rebase and --rebase are mutually exclusive",
+			errMsg:  "--source-branch cannot be used with the report command",
 		},
 		{
-			name: "skip-rebase requires merge",
+			name: "report with skip-rebase is invalid",
 			config: Config{
 				Org:          "myorg",
-				SourceBranch: "dependabot/",
 				Token:        "test-token",
+				Report:       true,
 				SkipRebase:   true,
-				Merge:        false,
+				MinGroupSize: 2,
+				Command:      CommandReport,
 			},
 			wantErr: true,
-			errMsg:  "--skip-rebase requires --merge",
+			errMsg:  "--skip-rebase cannot be used with the report command",
+		},
+		{
+			name: "report with confirm is invalid",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				Confirm:      true,
+				MinGroupSize: 2,
+				Command:      CommandReport,
+			},
+			wantErr: true,
+			errMsg:  "--confirm cannot be used with the report command",
+		},
+		{
+			name: "report with invalid verbosity",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "invalid",
+				Command:      CommandReport,
+			},
+			wantErr: true,
+			errMsg:  "--verbosity must be one of",
+		},
+		{
+			name: "report with valid verbosity brief",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "brief",
+				Command:      CommandReport,
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with valid verbosity standard",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "standard",
+				Command:      CommandReport,
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with valid verbosity verbose",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 2,
+				Verbosity:    "verbose",
+				Command:      CommandReport,
+			},
+			wantErr: false,
+		},
+		{
+			name: "report with min-group-size zero",
+			config: Config{
+				Org:          "myorg",
+				Token:        "test-token",
+				Report:       true,
+				MinGroupSize: 0,
+				Command:      CommandReport,
+			},
+			wantErr: true,
+			errMsg:  "--min-group-size must be at least 1",
+		},
+		{
+			name: "report with source-branch-prefix",
+			config: Config{
+				Org:                "myorg",
+				Token:              "test-token",
+				Report:             true,
+				MinGroupSize:       2,
+				SourceBranchPrefix: []string{"dependabot/"},
+				Command:            CommandReport,
+			},
+			wantErr: false,
 		},
 	}
 
@@ -306,210 +609,31 @@ func TestIsAnalysisOnly(t *testing.T) {
 		want   bool
 	}{
 		{
-			name:   "default is analysis only",
+			name:   "no subcommand is analysis only",
 			config: Config{},
 			want:   true,
 		},
 		{
-			name:   "rebase only is not analysis only",
-			config: Config{Rebase: true},
+			name:   "report is analysis only",
+			config: Config{Report: true, Command: CommandReport},
+			want:   true,
+		},
+		{
+			name:   "rebase is not analysis only",
+			config: Config{Rebase: true, Command: CommandRebase},
 			want:   false,
 		},
 		{
-			name:   "merge only is not analysis only",
-			config: Config{Merge: true},
+			name:   "merge is not analysis only",
+			config: Config{Merge: true, Command: CommandMerge},
 			want:   false,
 		},
-		// Note: --rebase and --merge together is invalid and rejected by Validate()
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.config.IsAnalysisOnly(); got != tt.want {
 				t.Errorf("IsAnalysisOnly() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestConfigValidateReportMode(t *testing.T) {
-	tests := []struct {
-		name    string
-		config  Config
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name: "valid report config",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 2,
-			},
-			wantErr: false,
-		},
-		{
-			name: "report with source-branch is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				SourceBranch: "dependabot/",
-				MinGroupSize: 2,
-			},
-			wantErr: true,
-			errMsg:  "--source-branch cannot be used with --report",
-		},
-		{
-			name: "report with rebase is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				Rebase:       true,
-				MinGroupSize: 2,
-			},
-			wantErr: true,
-			errMsg:  "--rebase cannot be used with --report",
-		},
-		{
-			name: "report with merge is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				Merge:        true,
-				MinGroupSize: 2,
-			},
-			wantErr: true,
-			errMsg:  "--merge cannot be used with --report",
-		},
-		{
-			name: "report with skip-rebase is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				SkipRebase:   true,
-				MinGroupSize: 2,
-			},
-			wantErr: true,
-			errMsg:  "--skip-rebase cannot be used with --report",
-		},
-		{
-			name: "report with confirm is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				Confirm:      true,
-				MinGroupSize: 2,
-			},
-			wantErr: true,
-			errMsg:  "--confirm cannot be used with --report",
-		},
-		{
-			name: "report with invalid verbosity",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 2,
-				Verbosity:    "invalid",
-			},
-			wantErr: true,
-			errMsg:  "--verbosity must be one of",
-		},
-		{
-			name: "report with valid verbosity brief",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 2,
-				Verbosity:    "brief",
-			},
-			wantErr: false,
-		},
-		{
-			name: "report with valid verbosity standard",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 2,
-				Verbosity:    "standard",
-			},
-			wantErr: false,
-		},
-		{
-			name: "report with valid verbosity verbose",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 2,
-				Verbosity:    "verbose",
-			},
-			wantErr: false,
-		},
-		{
-			name: "report with min-group-size zero",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				Report:       true,
-				MinGroupSize: 0,
-			},
-			wantErr: true,
-			errMsg:  "--min-group-size must be at least 1",
-		},
-		{
-			name: "report with source-branch-prefix",
-			config: Config{
-				Org:                "myorg",
-				Token:              "test-token",
-				Report:             true,
-				MinGroupSize:       2,
-				SourceBranchPrefix: []string{"dependabot/"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "non-report with source-branch-prefix is invalid",
-			config: Config{
-				Org:                "myorg",
-				Token:              "test-token",
-				SourceBranch:       "dependabot/",
-				SourceBranchPrefix: []string{"dependabot/"},
-			},
-			wantErr: true,
-			errMsg:  "--source-branch-prefix can only be used with --report",
-		},
-		{
-			name: "non-report with verbosity is invalid",
-			config: Config{
-				Org:          "myorg",
-				Token:        "test-token",
-				SourceBranch: "dependabot/",
-				Verbosity:    "brief",
-			},
-			wantErr: true,
-			errMsg:  "--verbosity can only be used with --report",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if tt.wantErr && err != nil {
-				if !contains(err.Error(), tt.errMsg) {
-					t.Errorf("Validate() error = %v, want to contain %v", err, tt.errMsg)
-				}
 			}
 		})
 	}
@@ -526,25 +650,28 @@ func TestParseFlagsReport(t *testing.T) {
 	os.Setenv("GITHUB_TOKEN", "test-token")
 	os.Setenv("GITHUB_ORG", "")
 
-	// Test basic report flag parsing
-	cfg, err := ParseFlags([]string{"--org", "myorg", "--report"}, "test")
+	// Test basic report subcommand
+	cfg, err := ParseFlags([]string{"--org", "myorg", "report"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
 	if !cfg.Report {
 		t.Error("expected Report = true")
 	}
+	if cfg.Command != CommandReport {
+		t.Errorf("expected Command = report, got %v", cfg.Command)
+	}
 	if cfg.MinGroupSize != 2 {
 		t.Errorf("expected default MinGroupSize = 2, got %d", cfg.MinGroupSize)
 	}
 
 	// Test report with source-branch-prefix
-	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--source-branch-prefix", "dependabot/,repver/"}, "test")
+	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--source-branch-prefix", "dependabot/,repver/"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
 	if len(cfg.SourceBranchPrefix) != 2 {
-		t.Errorf("expected 2 prefixes, got %d", len(cfg.SourceBranchPrefix))
+		t.Fatalf("expected 2 prefixes, got %d: %v", len(cfg.SourceBranchPrefix), cfg.SourceBranchPrefix)
 	}
 	if cfg.SourceBranchPrefix[0] != "dependabot/" {
 		t.Errorf("expected first prefix = dependabot/, got %s", cfg.SourceBranchPrefix[0])
@@ -554,7 +681,7 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with min-group-size
-	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--min-group-size", "5"}, "test")
+	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--min-group-size", "5"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
@@ -563,12 +690,21 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with verbosity
-	cfg, err = ParseFlags([]string{"--org", "myorg", "--report", "--verbosity", "brief"}, "test")
+	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--verbosity", "brief"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
 	if cfg.Verbosity != "brief" {
 		t.Errorf("expected Verbosity = brief, got %s", cfg.Verbosity)
+	}
+
+	// Test report with repo under subcommand
+	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--repo", "myrepo"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != "myrepo" {
+		t.Errorf("expected Repos = [myrepo], got %v", cfg.Repos)
 	}
 }
 
