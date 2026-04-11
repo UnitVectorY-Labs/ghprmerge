@@ -15,25 +15,25 @@ func TestParseFlags(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name             string
-		args             []string
-		envToken         string
-		envOrg           string
-		wantOrg          string
-		wantBranch       string
-		wantBranches     []string
-		wantRebase       bool
-		wantMerge        bool
-		wantSkipRebase   bool
-		wantRepoLimit    int
-		wantJSON         bool
-		wantVerbose      bool
-		wantNoColor      bool
-		wantConfirm      bool
-		wantRepos        []string
-		wantReport       bool
-		wantCommand      Command
-		wantErr          bool
+		name           string
+		args           []string
+		envToken       string
+		envOrg         string
+		wantOrg        string
+		wantBranch     string
+		wantBranches   []string
+		wantRebase     bool
+		wantMerge      bool
+		wantSkipRebase bool
+		wantRepoLimit  int
+		wantJSON       bool
+		wantVerbose    bool
+		wantNoColor    bool
+		wantConfirm    bool
+		wantRepos      []string
+		wantReport     bool
+		wantCommand    Command
+		wantErr        bool
 	}{
 		{
 			name:          "rebase subcommand with json and limit",
@@ -59,33 +59,33 @@ func TestParseFlags(t *testing.T) {
 			wantCommand: CommandNone,
 		},
 		{
-			name:       "org from env",
-			args:       []string{"merge", "--source-branch", "dependabot/"},
-			envToken:   "test-token",
-			envOrg:     "envorg",
-			wantOrg:    "envorg",
-			wantBranch: "dependabot/",
-			wantMerge:  true,
+			name:        "org from env",
+			args:        []string{"merge", "--source-branch", "dependabot/"},
+			envToken:    "test-token",
+			envOrg:      "envorg",
+			wantOrg:     "envorg",
+			wantBranch:  "dependabot/",
+			wantMerge:   true,
 			wantCommand: CommandMerge,
 		},
 		{
-			name:       "multiple global repos",
-			args:       []string{"--org", "myorg", "--repo", "repo1", "--repo", "repo2", "merge", "--source-branch", "test"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "test",
-			wantRepos:  []string{"repo1", "repo2"},
-			wantMerge:  true,
+			name:        "multiple global repos",
+			args:        []string{"--org", "myorg", "--repo", "repo1", "--repo", "repo2", "merge", "--source-branch", "test"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "test",
+			wantRepos:   []string{"repo1", "repo2"},
+			wantMerge:   true,
 			wantCommand: CommandMerge,
 		},
 		{
-			name:       "repos from both global and subcommand",
-			args:       []string{"--org", "myorg", "--repo", "repo1", "merge", "--source-branch", "test", "--repo", "repo2"},
-			envToken:   "test-token",
-			wantOrg:    "myorg",
-			wantBranch: "test",
-			wantRepos:  []string{"repo1", "repo2"},
-			wantMerge:  true,
+			name:        "repos from both global and subcommand",
+			args:        []string{"--org", "myorg", "--repo", "repo1", "merge", "--source-branch", "test", "--repo", "repo2"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "test",
+			wantRepos:   []string{"repo1", "repo2"},
+			wantMerge:   true,
 			wantCommand: CommandMerge,
 		},
 		{
