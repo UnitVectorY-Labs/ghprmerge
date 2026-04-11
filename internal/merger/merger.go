@@ -44,10 +44,13 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		repoLimitDesc = fmt.Sprintf("%d repositories max", m.config.RepoLimit)
 	}
 
+	// Build source branch description
+	sourceBranchDesc := strings.Join(m.config.SourceBranches, ", ")
+
 	result := &output.RunResult{
 		Metadata: output.RunMetadata{
 			Org:           m.config.Org,
-			SourceBranch:  m.config.SourceBranch,
+			SourceBranch:  sourceBranchDesc,
 			Mode:          mode,
 			Rebase:        m.config.Rebase,
 			Merge:         m.config.Merge,
@@ -69,7 +72,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 
 	// Print header and start progress
 	if m.console != nil && !m.config.JSON {
-		m.console.PrintHeader(m.config.Org, mode, m.config.SourceBranch)
+		m.console.PrintHeader(m.config.Org, mode, sourceBranchDesc)
 		if m.config.RepoLimit > 0 {
 			fmt.Fprintf(m.console.Writer(), "%s\n", m.console.Dim(fmt.Sprintf("Limit: %d repositories max", m.config.RepoLimit)))
 		}
@@ -374,7 +377,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		// If rebase is not enabled, skip
 		if !m.config.Rebase {
 			result.Action = output.ActionSkipBranchBehind
-			result.Reason = fmt.Sprintf("branch is %d commits behind base (use --rebase to update)", branchStatus.BehindBy)
+			result.Reason = fmt.Sprintf("branch is %d commits behind base (use the rebase command to update)", branchStatus.BehindBy)
 			result.SkipReason = output.ReasonBranchBehind
 			return result
 		}
@@ -396,7 +399,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		result.Reason = checksState + ", branch up to date"
 	} else {
 		result.Action = output.ActionReadyMerge
-		result.Reason = checksState + ", branch up to date (use --merge to merge)"
+		result.Reason = checksState + ", branch up to date (use the merge command to merge)"
 	}
 
 	return result
@@ -530,6 +533,10 @@ func (m *Merger) processRepository(ctx context.Context, repo gh.Repository) outp
 }
 
 // discoverPullRequests discovers all candidate pull requests for a repository.
+// When multiple source branches are configured, PRs matching any of the patterns
+// are included. If multiple source branches match the same repo, only the first
+// matching source branch (by order specified) is used; subsequent matches are
+// logged as skipped with a "concurrent" reason.
 func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) ([]gh.PullRequest, error) {
 	owner := strings.Split(repo.FullName, "/")[0]
 
@@ -540,19 +547,38 @@ func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) (
 
 	// Filter pull requests
 	var prs []gh.PullRequest
+	// Track which source branch pattern was the first to match this repo
+	firstMatchedPattern := ""
+
 	for _, pr := range allPRs {
 		// Skip drafts
 		if pr.Draft {
 			continue
 		}
 
-		// Match source branch pattern
-		if !gh.MatchesBranchPattern(pr.HeadBranch, m.config.SourceBranch) {
+		// Ensure targeting default branch
+		if pr.BaseBranch != repo.DefaultBranch {
 			continue
 		}
 
-		// Ensure targeting default branch
-		if pr.BaseBranch != repo.DefaultBranch {
+		// Match against any of the configured source branch patterns
+		matchedPattern := ""
+		for _, pattern := range m.config.SourceBranches {
+			if gh.MatchesBranchPattern(pr.HeadBranch, pattern) {
+				matchedPattern = pattern
+				break
+			}
+		}
+		if matchedPattern == "" {
+			continue
+		}
+
+		// Concurrent check: if this repo already matched a different source branch
+		// pattern, skip PRs from subsequent patterns
+		if firstMatchedPattern == "" {
+			firstMatchedPattern = matchedPattern
+		} else if matchedPattern != firstMatchedPattern {
+			// Different source branch pattern for the same repo - skip as concurrent
 			continue
 		}
 
@@ -694,7 +720,7 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 	// If merge is not enabled, just report
 	if !m.config.Merge {
 		result.Action = output.ActionReadyMerge
-		result.Reason = checksState + ", branch up to date (use --merge to merge)"
+		result.Reason = checksState + ", branch up to date (use the merge command to merge)"
 		return result
 	}
 

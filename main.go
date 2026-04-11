@@ -73,7 +73,7 @@ func run() error {
 		return runReport(ctx, m, cfg)
 	}
 
-	// Normal mode: act on a single source branch
+	// Normal mode (merge, rebase, or analysis): act on source branches
 	return runNormal(ctx, m, cfg, console)
 }
 
