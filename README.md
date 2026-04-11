@@ -2,7 +2,7 @@
 
 # ghprmerge
 
-A command-line tool to automatically evaluate, merge, and optionally rebase GitHub pull requests sharing the same source branch across an organization.
+A command-line tool to automatically merge and rebase GitHub pull requests sharing the same source branch across an organization.
 
 Use case: merging automated dependency update pull requests (e.g., Dependabot) without requiring clicking through each repository individually.
 
@@ -15,37 +15,37 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 # Check version
 ghprmerge --version
 
-# Analyze what would be merged (default mode)
-ghprmerge --org myorg --source-branch dependabot/
-
 # Rebase out-of-date branches
-ghprmerge --org myorg --source-branch dependabot/ --rebase
+ghprmerge --org myorg rebase --source-branch dependabot/
 
 # Merge ready PRs (that are already up-to-date)
-ghprmerge --org myorg --source-branch dependabot/ --merge
+ghprmerge --org myorg merge --source-branch dependabot/
 
 # PRs with no checks configured are allowed; pending checks still block merging
 
 # Merge PRs even if behind (skip rebase requirement)
-ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
+ghprmerge --org myorg merge --source-branch dependabot/ --skip-rebase
+
+# Match multiple source branches
+ghprmerge --org myorg merge --source-branch dependabot/ --source-branch feature/
 
 # Use --confirm to review pending actions before taking action
-ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
+ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
 
 # Stream all repo results as they are scanned
-ghprmerge --org myorg --source-branch dependabot/ --verbose
+ghprmerge --org myorg --verbose merge --source-branch dependabot/
 
 # Disable colored output
-ghprmerge --org myorg --source-branch dependabot/ --no-color
+ghprmerge --org myorg --no-color merge --source-branch dependabot/
 
 # Report mode: group open PRs by source branch
-ghprmerge --org myorg --report
+ghprmerge --org myorg report
 
 # Report with prefix filter and JSON output
-ghprmerge --org myorg --report --source-branch-prefix dependabot/ --json
+ghprmerge --org myorg --json report --source-branch-prefix dependabot/
 
 # Report with minimum group size
-ghprmerge --org myorg --report --min-group-size 3
+ghprmerge --org myorg report --min-group-size 3
 ```
 
 ## Documentation
@@ -53,6 +53,9 @@ ghprmerge --org myorg --report --min-group-size 3
 - [Purpose & Philosophy](docs/README.md) - Design goals and safety model
 - [Usage Guide](docs/USAGE.md) - Complete command-line reference
 - [Examples](docs/EXAMPLES.md) - Practical workflows
+- [Merge Command](docs/MERGE.md) - Merge subcommand details
+- [Rebase Command](docs/REBASE.md) - Rebase subcommand details
+- [Report Command](docs/REPORT.md) - Report subcommand details
 - [Installation](docs/INSTALL.md) - Installation instructions
 
 ## License
