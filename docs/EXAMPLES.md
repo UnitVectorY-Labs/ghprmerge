@@ -13,37 +13,27 @@ permalink: /examples
 ghprmerge --version
 ```
 
-## Default Analysis Run
-
-Preview what would happen without making any changes:
-
-```bash
-ghprmerge --org myorg --source-branch dependabot/
-```
-
-This scans all repositories, evaluates PRs, and reports what would be rebased and merged.
-
-## Rebase Only Run
+## Rebase Run
 
 Update out-of-date branches without merging:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --rebase
+ghprmerge --org myorg rebase --source-branch dependabot/
 ```
 
 For Dependabot branches, this posts a `@dependabot rebase` comment. For other branches, it uses GitHub's update branch API.
 
-**Note**: `--rebase` and `--merge` are mutually exclusive. After rebasing, wait for checks to pass then run with `--merge`.
+**Note**: `merge` and `rebase` are separate subcommands and cannot be combined. After rebasing, wait for checks to pass then run `merge`.
 
-## Merge Only Run
+## Merge Run
 
 Merge PRs that are already in a valid state (up-to-date, checks passing):
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --merge
+ghprmerge --org myorg merge --source-branch dependabot/
 ```
 
-PRs that are behind the default branch will be skipped (use `--rebase` first to update them, or `--skip-rebase` to merge anyway).
+PRs that are behind the default branch will be skipped (use `rebase` first to update them, or `--skip-rebase` to merge anyway).
 
 PRs with no checks configured are allowed to merge. PRs with pending checks are still skipped.
 
@@ -52,29 +42,33 @@ PRs with no checks configured are allowed to merge. PRs with pending checks are 
 Merge PRs even when they are behind the default branch:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --merge --skip-rebase
+ghprmerge --org myorg merge --source-branch dependabot/ --skip-rebase
 ```
 
 This is useful when your repository is configured to not require branches to be up-to-date before merging. The `--skip-rebase` flag allows merging without first updating the branch.
 
-**Note**: `--skip-rebase` requires `--merge` and cannot be used with `--rebase`. PRs with merge conflicts or failing checks will still be skipped.
+**Note**: `--skip-rebase` is only available under the `merge` subcommand. PRs with merge conflicts or failing checks will still be skipped.
 
 ## Confirmation Mode
 
 Scan all repositories first, then prompt before taking actions:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
+ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
 ```
 
-This is useful when you want to review the planned actions before execution. Pending actions are listed, and on confirmation, execution progress is shown with a progress bar.
+Use `--confirm` with either `merge` or `rebase` to preview planned actions before execution. Pending actions are listed, and on confirmation, execution progress is shown with a progress bar.
+
+```bash
+ghprmerge --org myorg merge --source-branch dependabot/ --confirm
+```
 
 ## Verbose Output
 
 Stream repository decisions as each repository is scanned, including repositories with no matching pull requests:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --verbose
+ghprmerge --org myorg --verbose merge --source-branch dependabot/
 ```
 
 By default, the scan stays quiet apart from the progress bar and only repositories with matching PRs are displayed after the scan completes.
@@ -84,7 +78,7 @@ By default, the scan stays quiet apart from the progress bar and only repositori
 Stream scan-time decisions, then clear them before showing the actions that were actually performed:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --merge --confirm --verbose
+ghprmerge --org myorg --verbose merge --source-branch dependabot/ --confirm
 ```
 
 This is useful when you want live visibility during the scan without leaving the terminal full of pending entries after you confirm.
@@ -94,7 +88,7 @@ This is useful when you want live visibility during the scan without leaving the
 Disable ANSI color codes for piping or CI:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --no-color
+ghprmerge --org myorg --no-color merge --source-branch dependabot/
 ```
 
 ## Scoped Repository Run
@@ -102,7 +96,24 @@ ghprmerge --org myorg --source-branch dependabot/ --no-color
 Only process specific repositories:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --repo repo1 --repo repo2 --merge
+ghprmerge --org myorg --repo repo1 --repo repo2 merge --source-branch dependabot/
+```
+
+## Multiple Source Branches
+
+Match PRs from multiple source branch patterns in a single pass:
+
+```bash
+# Merge PRs matching either dependabot/ or repver/ patterns in a single pass
+ghprmerge --org myorg merge --source-branch dependabot/ --source-branch repver/
+```
+
+Specifying multiple `--source-branch` flags scans all repositories once and matches PRs against each pattern. This reduces the number of scanning passes compared to running separate commands for each pattern. When multiple patterns match PRs in the same repository, the first matching pattern per repository takes priority for concurrent PR handling.
+
+Multiple source branches also work with the `rebase` subcommand:
+
+```bash
+ghprmerge --org myorg rebase --source-branch dependabot/ --source-branch repver/
 ```
 
 ## Dependabot Focused Run
@@ -110,13 +121,13 @@ ghprmerge --org myorg --source-branch dependabot/ --repo repo1 --repo repo2 --me
 Match only Dependabot npm updates:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/npm_and_yarn/ --merge
+ghprmerge --org myorg merge --source-branch dependabot/npm_and_yarn/
 ```
 
 Match only Go module updates:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/go_modules/ --merge
+ghprmerge --org myorg merge --source-branch dependabot/go_modules/
 ```
 
 ## Limited Run
@@ -124,7 +135,7 @@ ghprmerge --org myorg --source-branch dependabot/go_modules/ --merge
 Process at most 10 repositories:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --repo-limit 10 --merge
+ghprmerge --org myorg --repo-limit 10 merge --source-branch dependabot/
 ```
 
 ## JSON Output for Scripting
@@ -132,13 +143,13 @@ ghprmerge --org myorg --source-branch dependabot/ --repo-limit 10 --merge
 Get structured output for automation:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --json | jq '.summary'
+ghprmerge --org myorg --json merge --source-branch dependabot/ | jq '.summary'
 ```
 
 Pipe to other tools:
 
 ```bash
-ghprmerge --org myorg --source-branch dependabot/ --json | \
+ghprmerge --org myorg --json merge --source-branch dependabot/ | \
   jq -r '.repositories[].pull_requests[] | select(.action == "would merge") | .url'
 ```
 
@@ -147,43 +158,43 @@ ghprmerge --org myorg --source-branch dependabot/ --json | \
 Scan open PRs across the organization and group them by source branch name:
 
 ```bash
-ghprmerge --org myorg --report
+ghprmerge --org myorg report
 ```
 
 Filter to specific branch prefixes:
 
 ```bash
-ghprmerge --org myorg --report --source-branch-prefix dependabot/,repver/
+ghprmerge --org myorg report --source-branch-prefix dependabot/,repver/
 ```
 
 Require at least 3 PRs in a group:
 
 ```bash
-ghprmerge --org myorg --report --min-group-size 3
+ghprmerge --org myorg report --min-group-size 3
 ```
 
 Get JSON output for scripting:
 
 ```bash
-ghprmerge --org myorg --report --json
+ghprmerge --org myorg --json report
 ```
 
 Show only branch names and counts:
 
 ```bash
-ghprmerge --org myorg --report --verbosity brief
+ghprmerge --org myorg report --verbosity brief
 ```
 
 Include PR titles in the output:
 
 ```bash
-ghprmerge --org myorg --report --verbosity verbose
+ghprmerge --org myorg report --verbosity verbose
 ```
 
 Scope the report to specific repositories:
 
 ```bash
-ghprmerge --org myorg --report --repo repo1 --repo repo2
+ghprmerge --org myorg report --repo repo1 --repo repo2
 ```
 
 ## Using Environment Variables
@@ -192,7 +203,7 @@ ghprmerge --org myorg --report --repo repo1 --repo repo2
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 export GITHUB_ORG=myorg
 
-ghprmerge --source-branch dependabot/
+ghprmerge merge --source-branch dependabot/
 ```
 
 ## Complete Production Workflow
@@ -201,17 +212,14 @@ ghprmerge --source-branch dependabot/
 # Set authentication
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 
-# Step 1: Analyze what's available
-ghprmerge --org myorg --source-branch dependabot/
+# Step 1: Rebase out-of-date branches with confirmation
+ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
 
-# Step 2: Rebase out-of-date branches with confirmation
-ghprmerge --org myorg --source-branch dependabot/ --rebase --confirm
-
-# Step 3: Wait for checks to complete (manual or scripted)
+# Step 2: Wait for checks to complete (manual or scripted)
 sleep 300
 
-# Step 4: Merge ready PRs
-ghprmerge --org myorg --source-branch dependabot/ --merge
+# Step 3: Merge ready PRs
+ghprmerge --org myorg merge --source-branch dependabot/
 ```
 
 ## CI/CD Usage
@@ -237,13 +245,8 @@ jobs:
       - name: Check version
         run: ./ghprmerge --version
 
-      - name: Analyze
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        run: ./ghprmerge --org myorg --source-branch dependabot/ --json
-
       - name: Merge ready PRs
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        run: ./ghprmerge --org myorg --source-branch dependabot/ --merge --repo-limit 20
+        run: ./ghprmerge --org myorg --repo-limit 20 merge --source-branch dependabot/
 ```
