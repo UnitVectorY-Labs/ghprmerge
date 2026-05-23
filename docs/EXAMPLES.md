@@ -25,6 +25,7 @@ If you mistype a subcommand, ghprmerge will return a corrective error with valid
 
 ```bash
 ghprmerge --org myorg shipit
+# Error: unknown subcommand "shipit" (followed by valid subcommand guidance)
 ```
 
 ## Rebase Run

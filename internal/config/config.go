@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -311,7 +312,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 }
 
 func commandName() string {
-	return "ghprmerge"
+	if len(os.Args) == 0 || os.Args[0] == "" {
+		return "ghprmerge"
+	}
+	return filepath.Base(os.Args[0])
 }
 
 func subcommandSummary() string {
