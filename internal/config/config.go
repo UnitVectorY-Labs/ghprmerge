@@ -33,10 +33,12 @@ const (
 	CommandReport Command = "report"
 )
 
-var commandDescriptions = []struct {
+type CommandDescription struct {
 	Name        Command
 	Description string
-}{
+}
+
+var commandDescriptions = []CommandDescription{
 	{
 		Name:        CommandMerge,
 		Description: "merge ready pull requests after safety checks pass",
@@ -316,8 +318,8 @@ func subcommandSummary() string {
 	var b strings.Builder
 	maxNameWidth := 0
 	for _, cmd := range commandDescriptions {
-		if len(cmd.Name) > maxNameWidth {
-			maxNameWidth = len(cmd.Name)
+		if len(string(cmd.Name)) > maxNameWidth {
+			maxNameWidth = len(string(cmd.Name))
 		}
 	}
 	for _, cmd := range commandDescriptions {
