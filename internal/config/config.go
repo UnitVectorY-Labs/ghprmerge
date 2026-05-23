@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -134,6 +136,16 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+var semverRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
+
+func buildVersionOutput(version string) string {
+	normalized := version
+	if semverRe.MatchString(normalized) && !strings.HasPrefix(normalized, "v") {
+		normalized = "v" + normalized
+	}
+	return fmt.Sprintf("%s (%s, %s/%s)", normalized, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+}
+
 // ErrHelp is returned when -help or -h is passed.
 var ErrHelp = flag.ErrHelp
 
@@ -148,7 +160,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		// Check for --version or --help before subcommand parsing
 		for _, arg := range args {
 			if arg == "--version" || arg == "-version" {
-				fmt.Printf("ghprmerge version %s\n", version)
+				fmt.Printf("ghprmerge version %s\n", buildVersionOutput(version))
 				return nil, ErrVersion
 			}
 		}
@@ -200,7 +212,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	// Handle --version flag
 	if *showVersion {
-		fmt.Printf("ghprmerge version %s\n", version)
+		fmt.Printf("ghprmerge version %s\n", buildVersionOutput(version))
 		return nil, ErrVersion
 	}
 
