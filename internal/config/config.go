@@ -112,7 +112,7 @@ func (c *Config) Validate() error {
 	// Non-report mode validation
 	if len(c.SourceBranches) == 0 {
 		if c.Command == CommandNone {
-			return fmt.Errorf("--source-branch is required when no subcommand is provided\n\nChoose a subcommand:\n%s\n\nUse '%s --help' for full usage", subcommandSummary(), commandName())
+			return fmt.Errorf("%s", formatSubcommandGuidanceError("--source-branch is required when no subcommand is provided"))
 		}
 		return fmt.Errorf("--source-branch is required")
 	}
@@ -206,7 +206,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	if command == CommandNone {
 		remainingArgs := globalFS.Args()
 		if len(remainingArgs) > 0 {
-			return nil, fmt.Errorf("unknown subcommand %q\n\nChoose a subcommand:\n%s\n\nUse '%s --help' for full usage", remainingArgs[0], subcommandSummary(), commandName())
+			return nil, fmt.Errorf("%s", formatSubcommandGuidanceError(fmt.Sprintf("unknown subcommand %q", remainingArgs[0])))
 		}
 	}
 
@@ -348,6 +348,20 @@ func printSubcommandUsage(w io.Writer, command Command, subFS *flag.FlagSet) {
 	fmt.Fprintln(w, "Command flags:")
 	subFS.PrintDefaults()
 	fmt.Fprintf(w, "\nRun '%s --help' to see all commands and global flags.\n", commandName())
+}
+
+func formatSubcommandGuidanceError(summary string) string {
+	return fmt.Sprintf(
+		`%s
+
+Choose a subcommand:
+%s
+
+Use '%s --help' for full usage`,
+		summary,
+		subcommandSummary(),
+		commandName(),
+	)
 }
 
 // resolveToken resolves the GitHub authentication token.
