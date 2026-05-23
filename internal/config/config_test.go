@@ -289,24 +289,24 @@ func TestParseFlagsRejectsUnknownSubcommandFlag(t *testing.T) {
 	if _, err := ParseFlags([]string{"--org", "myorg", "rebase", "--source-branch", "dep/", "--skip-rebase"}, "test"); err == nil {
 		t.Fatal("ParseFlags() expected error for --skip-rebase under rebase subcommand")
 	}
+}
 
-	func TestParseFlagsRejectsUnknownSubcommand(t *testing.T) {
-		origToken := os.Getenv("GITHUB_TOKEN")
-		defer os.Setenv("GITHUB_TOKEN", origToken)
-		os.Setenv("GITHUB_TOKEN", "test-token")
+func TestParseFlagsRejectsUnknownSubcommand(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
 
-		_, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
-		if err == nil {
-			t.Fatal("ParseFlags() expected error for unknown subcommand")
-		}
+	_, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
+	if err == nil {
+		t.Fatal("ParseFlags() expected error for unknown subcommand")
+	}
 
-		errMsg := err.Error()
-		if !contains(errMsg, "unknown subcommand \"shipit\"") {
-			t.Fatalf("ParseFlags() error = %v, want unknown subcommand message", err)
-		}
-		if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
-			t.Fatalf("ParseFlags() error = %v, want command guidance listing merge/rebase/report", err)
-		}
+	errMsg := err.Error()
+	if !contains(errMsg, "unknown subcommand \"shipit\"") {
+		t.Fatalf("ParseFlags() error = %v, want unknown subcommand message", err)
+	}
+	if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
+		t.Fatalf("ParseFlags() error = %v, want command guidance listing merge/rebase/report", err)
 	}
 }
 
@@ -459,26 +459,6 @@ func TestConfigValidate(t *testing.T) {
 		},
 	}
 
-	func TestConfigValidateMissingSubcommandGuidance(t *testing.T) {
-		cfg := Config{
-			Org:   "myorg",
-			Token: "test-token",
-		}
-
-		err := cfg.Validate()
-		if err == nil {
-			t.Fatal("Validate() expected error when no subcommand and no source-branch are provided")
-		}
-
-		errMsg := err.Error()
-		if !contains(errMsg, "Choose a subcommand") {
-			t.Fatalf("Validate() error = %v, want missing-subcommand guidance", err)
-		}
-		if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
-			t.Fatalf("Validate() error = %v, want command guidance listing merge/rebase/report", err)
-		}
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
@@ -491,6 +471,26 @@ func TestConfigValidate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConfigValidateMissingSubcommandGuidance(t *testing.T) {
+	cfg := Config{
+		Org:   "myorg",
+		Token: "test-token",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() expected error when no subcommand and no source-branch are provided")
+	}
+
+	errMsg := err.Error()
+	if !contains(errMsg, "Choose a subcommand") {
+		t.Fatalf("Validate() error = %v, want missing-subcommand guidance", err)
+	}
+	if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
+		t.Fatalf("Validate() error = %v, want command guidance listing merge/rebase/report", err)
 	}
 }
 
