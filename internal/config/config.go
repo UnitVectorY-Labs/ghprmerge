@@ -112,7 +112,7 @@ func (c *Config) Validate() error {
 	// Non-report mode validation
 	if len(c.SourceBranches) == 0 {
 		if c.Command == CommandNone {
-			return fmt.Errorf("%s", formatSubcommandGuidanceError("--source-branch is required when no subcommand is provided"))
+			return errors.New(formatSubcommandGuidanceError("--source-branch is required when no subcommand is provided"))
 		}
 		return fmt.Errorf("--source-branch is required")
 	}
@@ -206,7 +206,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	if command == CommandNone {
 		remainingArgs := globalFS.Args()
 		if len(remainingArgs) > 0 {
-			return nil, fmt.Errorf("%s", formatSubcommandGuidanceError(fmt.Sprintf("unknown subcommand %q", remainingArgs[0])))
+			return nil, errors.New(formatSubcommandGuidanceError(fmt.Sprintf("unknown subcommand %q", remainingArgs[0])))
 		}
 	}
 
