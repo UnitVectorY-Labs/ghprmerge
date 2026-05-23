@@ -15,6 +15,9 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 # Check version
 ghprmerge --version
 
+# Show help with subcommand descriptions
+ghprmerge --help
+
 # Rebase out-of-date branches
 ghprmerge --org myorg rebase --source-branch dependabot/
 

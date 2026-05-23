@@ -17,6 +17,8 @@ The tool provides three subcommands:
 - **`rebase`** — update out-of-date PR branches across an organization
 - **`report`** — scan open PRs and group them by source branch name, helping you identify common updates that span multiple repositories
 
+The built-in CLI help (`ghprmerge --help`) includes these subcommand descriptions so users and automation agents can quickly select the correct mode without opening external documentation.
+
 ## Safety Model
 
 ghprmerge is designed to be **safe by default**:
