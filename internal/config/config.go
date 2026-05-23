@@ -5,8 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -31,6 +33,26 @@ const (
 	CommandRebase Command = "rebase"
 	CommandReport Command = "report"
 )
+
+type CommandDescription struct {
+	Name        Command
+	Description string
+}
+
+var commandDescriptions = []CommandDescription{
+	{
+		Name:        CommandMerge,
+		Description: "merge ready pull requests after safety checks pass",
+	},
+	{
+		Name:        CommandRebase,
+		Description: "update pull request branches that are behind the default branch",
+	},
+	{
+		Name:        CommandReport,
+		Description: "scan open pull requests and group them by source branch",
+	},
+}
 
 // Config holds all configuration for ghprmerge.
 type Config struct {
@@ -90,6 +112,9 @@ func (c *Config) Validate() error {
 
 	// Non-report mode validation
 	if len(c.SourceBranches) == 0 {
+		if c.Command == CommandNone {
+			return errors.New(formatSubcommandGuidanceError("choose a subcommand or provide --source-branch for analysis-only mode"))
+		}
 		return fmt.Errorf("--source-branch is required")
 	}
 	if len(c.SourceBranchPrefix) > 0 {
@@ -155,7 +180,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	}
 
 	// Parse global flags
-	globalFS := flag.NewFlagSet("ghprmerge", flag.ContinueOnError)
+	globalFS := flag.NewFlagSet(commandName(), flag.ContinueOnError)
 	org := globalFS.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
 	repoLimit := globalFS.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
 	jsonOutput := globalFS.Bool("json", false, "Output structured JSON instead of human-readable text")
@@ -165,6 +190,9 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	var globalRepos StringSliceFlag
 	globalFS.Var(&globalRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+	globalFS.Usage = func() {
+		printGlobalUsage(globalFS.Output(), globalFS)
+	}
 
 	if err := globalFS.Parse(globalArgs); err != nil {
 		return nil, err
@@ -174,6 +202,13 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	if *showVersion {
 		fmt.Printf("ghprmerge version %s\n", version)
 		return nil, ErrVersion
+	}
+
+	if command == CommandNone {
+		remainingArgs := globalFS.Args()
+		if len(remainingArgs) > 0 {
+			return nil, errors.New(formatSubcommandGuidanceError(fmt.Sprintf("unknown subcommand %q", remainingArgs[0])))
+		}
 	}
 
 	// Parse subcommand-specific flags
@@ -189,6 +224,9 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	if command != CommandNone {
 		subFS := flag.NewFlagSet(string(command), flag.ContinueOnError)
+		subFS.Usage = func() {
+			printSubcommandUsage(subFS.Output(), command, subFS)
+		}
 
 		switch command {
 		case CommandMerge:
@@ -271,6 +309,63 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		Verbosity:          verbosity,
 		Command:            command,
 	}, nil
+}
+
+func commandName() string {
+	if len(os.Args) == 0 || os.Args[0] == "" {
+		return "ghprmerge"
+	}
+	return filepath.Base(os.Args[0])
+}
+
+func subcommandSummary() string {
+	var b strings.Builder
+	maxNameWidth := 0
+	for _, cmd := range commandDescriptions {
+		if len(string(cmd.Name)) > maxNameWidth {
+			maxNameWidth = len(string(cmd.Name))
+		}
+	}
+	for _, cmd := range commandDescriptions {
+		fmt.Fprintf(&b, "  %-*s %s\n", maxNameWidth, cmd.Name, cmd.Description)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func printGlobalUsage(w io.Writer, globalFS *flag.FlagSet) {
+	fmt.Fprintf(w, "Usage:\n  %s [global-flags] <command> [command-flags]\n\n", commandName())
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, subcommandSummary())
+	fmt.Fprintf(w, "\nUse '%s <command> --help' for command-specific flags.\n\n", commandName())
+	fmt.Fprintln(w, "Global flags:")
+	globalFS.PrintDefaults()
+}
+
+func printSubcommandUsage(w io.Writer, command Command, subFS *flag.FlagSet) {
+	fmt.Fprintf(w, "Usage:\n  %s [global-flags] %s [command-flags]\n\n", commandName(), command)
+	for _, cmd := range commandDescriptions {
+		if cmd.Name == command {
+			fmt.Fprintf(w, "%s: %s\n\n", command, cmd.Description)
+			break
+		}
+	}
+	fmt.Fprintln(w, "Command flags:")
+	subFS.PrintDefaults()
+	fmt.Fprintf(w, "\nRun '%s --help' to see all commands and global flags.\n", commandName())
+}
+
+func formatSubcommandGuidanceError(summary string) string {
+	return fmt.Sprintf(
+		`%s
+
+Choose a subcommand:
+%s
+
+Use '%s --help' for full usage`,
+		summary,
+		subcommandSummary(),
+		commandName(),
+	)
 }
 
 // resolveToken resolves the GitHub authentication token.

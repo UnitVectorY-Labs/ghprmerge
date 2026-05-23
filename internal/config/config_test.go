@@ -291,6 +291,28 @@ func TestParseFlagsRejectsUnknownSubcommandFlag(t *testing.T) {
 	}
 }
 
+func TestParseFlagsRejectsUnknownSubcommand(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
+
+	cfg, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
+	if err == nil {
+		t.Fatal("ParseFlags() expected error for unknown subcommand")
+	}
+	if cfg != nil {
+		t.Fatalf("ParseFlags() config = %v, want nil on unknown subcommand", cfg)
+	}
+
+	errMsg := err.Error()
+	if !contains(errMsg, "unknown subcommand \"shipit\"") {
+		t.Fatalf("ParseFlags() error = %v, want unknown subcommand message", err)
+	}
+	if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
+		t.Fatalf("ParseFlags() error = %v, want command guidance listing merge/rebase/report", err)
+	}
+}
+
 func TestConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -374,7 +396,7 @@ func TestConfigValidate(t *testing.T) {
 				Token: "test-token",
 			},
 			wantErr: true,
-			errMsg:  "--source-branch is required",
+			errMsg:  "choose a subcommand or provide --source-branch for analysis-only mode",
 		},
 		{
 			name: "missing token",
@@ -452,6 +474,26 @@ func TestConfigValidate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConfigValidateMissingSubcommandGuidance(t *testing.T) {
+	cfg := Config{
+		Org:   "myorg",
+		Token: "test-token",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() expected error when no subcommand and no source-branch are provided")
+	}
+
+	errMsg := err.Error()
+	if !contains(errMsg, "Choose a subcommand") {
+		t.Fatalf("Validate() error = %v, want missing-subcommand guidance", err)
+	}
+	if !contains(errMsg, "merge") || !contains(errMsg, "rebase") || !contains(errMsg, "report") {
+		t.Fatalf("Validate() error = %v, want command guidance listing merge/rebase/report", err)
 	}
 }
 

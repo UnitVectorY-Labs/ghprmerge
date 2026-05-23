@@ -13,6 +13,21 @@ permalink: /examples
 ghprmerge --version
 ```
 
+## Discover Commands and Their Purpose
+
+Show top-level help with a brief summary of each subcommand:
+
+```bash
+ghprmerge --help
+```
+
+If you mistype a subcommand, ghprmerge will return a corrective error with valid subcommands:
+
+```bash
+ghprmerge --org myorg shipit
+# Error: unknown subcommand "shipit" (followed by valid subcommand guidance)
+```
+
 ## Rebase Run
 
 Update out-of-date branches without merging:

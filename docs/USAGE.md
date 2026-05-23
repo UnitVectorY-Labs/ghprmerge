@@ -15,6 +15,8 @@ ghprmerge [global-flags] <command> [command-flags]
 
 A subcommand is required. Choose `merge`, `rebase`, or `report`.
 
+If you run `ghprmerge --help`, the CLI includes a short purpose line for each subcommand so you can quickly choose the right mode.
+
 ## Global Flags
 
 These flags are placed before the subcommand and work with all commands.
@@ -42,6 +44,22 @@ These flags are placed before the subcommand and work with all commands.
 `--repo` can be specified both as a global flag (before the subcommand) and as a subcommand flag (after the subcommand).
 
 See each command's documentation for its full flag reference and examples.
+
+## Help and Invalid Command Guidance
+
+Use root help to discover commands and their purpose:
+
+```bash
+ghprmerge --help
+```
+
+If you provide an unknown subcommand, ghprmerge returns an error that includes the valid subcommands and what each one is for:
+
+```bash
+ghprmerge --org myorg shipit
+```
+
+If you omit a subcommand and required command-specific flags, the error message includes subcommand guidance so you can recover quickly.
 
 ## Environment Variables
 
