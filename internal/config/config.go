@@ -113,7 +113,7 @@ func (c *Config) Validate() error {
 	// Non-report mode validation
 	if len(c.SourceBranches) == 0 {
 		if c.Command == CommandNone {
-			return errors.New(formatSubcommandGuidanceError("--source-branch is required when no subcommand is provided"))
+			return errors.New(formatSubcommandGuidanceError("choose a subcommand or provide --source-branch for analysis-only mode"))
 		}
 		return fmt.Errorf("--source-branch is required")
 	}

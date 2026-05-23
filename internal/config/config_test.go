@@ -296,9 +296,12 @@ func TestParseFlagsRejectsUnknownSubcommand(t *testing.T) {
 	defer os.Setenv("GITHUB_TOKEN", origToken)
 	os.Setenv("GITHUB_TOKEN", "test-token")
 
-	_, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
+	cfg, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
 	if err == nil {
 		t.Fatal("ParseFlags() expected error for unknown subcommand")
+	}
+	if cfg != nil {
+		t.Fatalf("ParseFlags() config = %v, want nil on unknown subcommand", cfg)
 	}
 
 	errMsg := err.Error()
@@ -393,7 +396,7 @@ func TestConfigValidate(t *testing.T) {
 				Token: "test-token",
 			},
 			wantErr: true,
-			errMsg:  "--source-branch is required",
+			errMsg:  "choose a subcommand or provide --source-branch for analysis-only mode",
 		},
 		{
 			name: "missing token",
