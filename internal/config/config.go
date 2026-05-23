@@ -314,8 +314,14 @@ func commandName() string {
 
 func subcommandSummary() string {
 	var b strings.Builder
+	maxNameWidth := 0
 	for _, cmd := range commandDescriptions {
-		fmt.Fprintf(&b, "  %-7s %s\n", cmd.Name, cmd.Description)
+		if len(cmd.Name) > maxNameWidth {
+			maxNameWidth = len(cmd.Name)
+		}
+	}
+	for _, cmd := range commandDescriptions {
+		fmt.Fprintf(&b, "  %-*s %s\n", maxNameWidth, cmd.Name, cmd.Description)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
