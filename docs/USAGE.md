@@ -184,7 +184,11 @@ For non-Dependabot branches:
 ghprmerge --version
 ```
 
-Displays the version of ghprmerge.
+Displays the version of ghprmerge in the format:
+
+```text
+ghprmerge version vX.Y.Z (goX.Y, os/arch)
+```
 
 ## Repo Limit Semantics
 
