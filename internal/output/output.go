@@ -145,7 +145,7 @@ func (w *Writer) writeJSON(result *RunResult) error {
 
 // writeHuman writes the result in human-readable format as a condensed summary.
 func (w *Writer) writeHuman(result *RunResult) error {
-	c := NewConsole(w.out, w.noColor, false)
+	c := NewConsole(w.out, w.noColor, false, false)
 	c.PrintSummary(result.Summary)
 	return nil
 }

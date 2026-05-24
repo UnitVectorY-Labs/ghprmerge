@@ -806,7 +806,7 @@ func TestMergerConfirmDefaultDoesNotPrintRepoResultsDuringScan(t *testing.T) {
 		Confirm:        true,
 	}
 
-	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	m := New(mock, cfg, output.NewConsole(&buf, true, false, false))
 	if _, err := m.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -858,7 +858,7 @@ func TestMergerVerboseStreamsRepoOutcomesDuringScan(t *testing.T) {
 		Verbose:        true,
 	}
 
-	m := New(mock, cfg, output.NewConsole(&buf, true, true))
+	m := New(mock, cfg, output.NewConsole(&buf, true, true, false))
 	if _, err := m.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -915,7 +915,7 @@ func TestMergerRunWithActionsVerbosePrintsCompletedActions(t *testing.T) {
 		Verbose:        true,
 	}
 
-	m := New(mock, cfg, output.NewConsole(&buf, true, true))
+	m := New(mock, cfg, output.NewConsole(&buf, true, true, false))
 	scanResult, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -976,7 +976,7 @@ func TestMergerConfirmWithoutPendingActionsPrintsRepoResults(t *testing.T) {
 		Confirm:        true,
 	}
 
-	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	m := New(mock, cfg, output.NewConsole(&buf, true, false, false))
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -1295,7 +1295,7 @@ func TestMergerMergeModeStreamsActionResultsDuringScan(t *testing.T) {
 		Merge:          true,
 	}
 
-	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	m := New(mock, cfg, output.NewConsole(&buf, true, false, false))
 	result, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -1358,7 +1358,7 @@ func TestMergerRunWithActionsStreamsDuringExecution(t *testing.T) {
 	}
 
 	// Non-verbose confirm mode: scan first, then execute
-	m := New(mock, cfg, output.NewConsole(&buf, true, false))
+	m := New(mock, cfg, output.NewConsole(&buf, true, false, false))
 	scanResult, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)

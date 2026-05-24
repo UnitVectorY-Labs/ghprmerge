@@ -106,6 +106,20 @@ Disable ANSI color codes for piping or CI:
 ghprmerge --org myorg --no-color merge --source-branch dependabot/
 ```
 
+## Suppress Progress Bar
+
+Suppress the progress bar for scripting, CI pipelines, or when output is captured by another program:
+
+```bash
+ghprmerge --org myorg --no-progress merge --source-branch dependabot/
+```
+
+Final results and the summary line are still printed; only the carriage-return-based percentage lines are suppressed. Combine with `--no-color` for fully clean output in non-TTY environments:
+
+```bash
+ghprmerge --org myorg --no-color --no-progress merge --source-branch dependabot/
+```
+
 ## Scoped Repository Run
 
 Only process specific repositories:
@@ -263,5 +277,5 @@ jobs:
       - name: Merge ready PRs
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        run: ./ghprmerge --org myorg --repo-limit 20 merge --source-branch dependabot/
+        run: ./ghprmerge --org myorg --no-progress --repo-limit 20 merge --source-branch dependabot/
 ```

@@ -29,6 +29,7 @@ These flags are placed before the subcommand and work with all commands.
 | `--json` | `false` | Output structured JSON |
 | `--verbose` | `false` | Stream repository results during scanning, including repos with no matching pull requests |
 | `--no-color` | `false` | Disable colored output |
+| `--no-progress` | `false` | Suppress progress bar output (useful for scripting, CI, and non-TTY environments) |
 | `--version` | - | Show version information and exit |
 
 ## Commands
@@ -156,6 +157,8 @@ A condensed summary line is printed at the end:
 ```
 
 Use `--no-color` to disable ANSI color codes (useful for piping output or CI environments).
+
+Use `--no-progress` to suppress the progress bar entirely. Final results and the summary line are still printed. This is recommended for scripting, CI pipelines, and any context where the output is captured or consumed by another program, since the carriage-return-based progress bar produces cluttered output in non-TTY environments.
 
 ### JSON Mode
 
