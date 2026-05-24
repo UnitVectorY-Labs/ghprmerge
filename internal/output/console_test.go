@@ -76,6 +76,26 @@ func TestConsoleProgressBarZeroTotal(t *testing.T) {
 	}
 }
 
+func TestConsoleNoProgressSuppressesProgressBar(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false, true) // noProgress=true
+
+	c.ProgressBar(5, 10, "Scanning")
+	if buf.Len() > 0 {
+		t.Errorf("ProgressBar: expected no output when noProgress=true, got: %q", buf.String())
+	}
+
+	c.FinishProgress()
+	if buf.Len() > 0 {
+		t.Errorf("FinishProgress: expected no output when noProgress=true, got: %q", buf.String())
+	}
+
+	c.ClearCurrentLine()
+	if buf.Len() > 0 {
+		t.Errorf("ClearCurrentLine: expected no output when noProgress=true, got: %q", buf.String())
+	}
+}
+
 func TestConsolePrintHeader(t *testing.T) {
 	var buf bytes.Buffer
 	c := NewConsole(&buf, true, false, false)
