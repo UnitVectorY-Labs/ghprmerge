@@ -51,7 +51,7 @@ func (w *Writer) writeReportHuman(result *ReportResult, verbosity string) error 
 		return nil
 	}
 
-	c := NewConsole(w.out, w.noColor, false)
+	c := NewConsole(w.out, w.noColor, false, false)
 	c.PrintReport(result, verbosity)
 	return nil
 }

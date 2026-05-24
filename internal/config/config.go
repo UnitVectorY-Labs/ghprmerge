@@ -70,6 +70,7 @@ type Config struct {
 	Confirm            bool
 	Verbose            bool
 	NoColor            bool
+	NoProgress         bool
 	Token              string
 	Report             bool
 	SourceBranchPrefix []string
@@ -198,6 +199,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	jsonOutput := globalFS.Bool("json", false, "Output structured JSON instead of human-readable text")
 	verbose := globalFS.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
 	noColor := globalFS.Bool("no-color", false, "Disable colored output")
+	noProgress := globalFS.Bool("no-progress", false, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
 	showVersion := globalFS.Bool("version", false, "Show version information and exit")
 
 	var globalRepos StringSliceFlag
@@ -314,6 +316,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		Confirm:            confirm,
 		Verbose:            *verbose,
 		NoColor:            *noColor,
+		NoProgress:         *noProgress,
 		Token:              token,
 		Report:             command == CommandReport,
 		SourceBranchPrefix: prefixes,

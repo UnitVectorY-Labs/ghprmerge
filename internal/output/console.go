@@ -31,17 +31,19 @@ const defaultTermWidth = 80
 
 // Console handles colored, formatted terminal output with progress bar support.
 type Console struct {
-	w       io.Writer
-	noColor bool
-	verbose bool
+	w          io.Writer
+	noColor    bool
+	verbose    bool
+	noProgress bool
 }
 
 // NewConsole creates a new Console for terminal output.
-func NewConsole(w io.Writer, noColor, verbose bool) *Console {
+func NewConsole(w io.Writer, noColor, verbose, noProgress bool) *Console {
 	return &Console{
-		w:       w,
-		noColor: noColor,
-		verbose: verbose,
+		w:          w,
+		noColor:    noColor,
+		verbose:    verbose,
+		noProgress: noProgress,
 	}
 }
 
@@ -82,7 +84,11 @@ func (c *Console) Bold(s string) string { return c.color(colorBold, s) }
 func (c *Console) Dim(s string) string { return c.color(colorDim, s) }
 
 // ProgressBar renders a progress bar on the current line using carriage return.
+// It is a no-op when noProgress is set.
 func (c *Console) ProgressBar(current, total int, label string) {
+	if c.noProgress {
+		return
+	}
 	if total == 0 {
 		return
 	}
@@ -167,12 +173,20 @@ func digitCount(n int) int {
 }
 
 // FinishProgress completes the progress bar by adding a newline.
+// It is a no-op when noProgress is set.
 func (c *Console) FinishProgress() {
+	if c.noProgress {
+		return
+	}
 	fmt.Fprintln(c.w)
 }
 
 // ClearCurrentLine clears the current terminal line.
+// It is a no-op when noProgress is set.
 func (c *Console) ClearCurrentLine() {
+	if c.noProgress {
+		return
+	}
 	fmt.Fprint(c.w, "\r\033[2K")
 }
 

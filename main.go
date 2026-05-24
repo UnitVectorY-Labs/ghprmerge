@@ -60,7 +60,7 @@ func run() error {
 	// Create console for terminal output (nil if JSON mode)
 	var console *output.Console
 	if !cfg.JSON {
-		console = output.NewConsole(os.Stderr, cfg.NoColor, cfg.Verbose)
+		console = output.NewConsole(os.Stderr, cfg.NoColor, cfg.Verbose, cfg.NoProgress)
 	}
 
 	// Create merger with console

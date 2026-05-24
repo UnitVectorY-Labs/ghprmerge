@@ -10,7 +10,7 @@ import (
 
 func TestConsoleColorEnabled(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
+	c := NewConsole(&buf, false, false, false) // noColor=false (colors enabled)
 
 	green := c.Green("success")
 	if !strings.Contains(green, "\033[32m") {
@@ -26,7 +26,7 @@ func TestConsoleColorEnabled(t *testing.T) {
 
 func TestConsoleColorDisabled(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false) // color disabled
+	c := NewConsole(&buf, true, false, false) // color disabled
 
 	green := c.Green("success")
 	if green != "success" {
@@ -41,7 +41,7 @@ func TestConsoleColorDisabled(t *testing.T) {
 
 func TestConsoleProgressBar(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false) // noColor for predictable output
+	c := NewConsole(&buf, true, false, false) // noColor for predictable output
 
 	c.ProgressBar(5, 10, "Testing")
 	output := buf.String()
@@ -68,7 +68,7 @@ func TestConsoleProgressBar(t *testing.T) {
 
 func TestConsoleProgressBarZeroTotal(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	c.ProgressBar(0, 0, "Testing")
 	if buf.Len() > 0 {
@@ -78,7 +78,7 @@ func TestConsoleProgressBarZeroTotal(t *testing.T) {
 
 func TestConsolePrintHeader(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	c.PrintHeader("myorg", "merge mode", "dependabot/")
 	output := buf.String()
@@ -99,7 +99,7 @@ func TestConsolePrintHeader(t *testing.T) {
 
 func TestConsolePrintRepoResult(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false) // noColor for predictable output
+	c := NewConsole(&buf, true, false, false) // noColor for predictable output
 
 	repo := RepositoryResult{
 		Name:          "repo1",
@@ -138,7 +138,7 @@ func TestConsolePrintRepoResult(t *testing.T) {
 
 func TestConsolePrintSummary(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	summary := RunSummary{
 		ReposProcessed:  100,
@@ -171,12 +171,12 @@ func TestConsolePrintSummary(t *testing.T) {
 func TestConsoleIsVerbose(t *testing.T) {
 	var buf bytes.Buffer
 
-	c1 := NewConsole(&buf, false, true)
+	c1 := NewConsole(&buf, false, true, false)
 	if !c1.IsVerbose() {
 		t.Error("Expected IsVerbose() to return true")
 	}
 
-	c2 := NewConsole(&buf, false, false)
+	c2 := NewConsole(&buf, false, false, false)
 	if c2.IsVerbose() {
 		t.Error("Expected IsVerbose() to return false")
 	}
@@ -209,7 +209,7 @@ func TestTruncateString(t *testing.T) {
 
 func TestConsoleColorActions(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false) // noColor for predictable output
+	c := NewConsole(&buf, true, false, false) // noColor for predictable output
 
 	tests := []struct {
 		action Action
@@ -263,7 +263,7 @@ func TestDigitCount(t *testing.T) {
 
 func TestProgressBarPaddedCounter(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	c.ProgressBar(1, 100, "Scanning")
 	output := buf.String()
@@ -276,7 +276,7 @@ func TestProgressBarPaddedCounter(t *testing.T) {
 
 func TestProgressBarSmoothBlocks(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	// At 33%, there should be partial blocks in the output
 	c.ProgressBar(1, 3, "Testing")
@@ -297,7 +297,7 @@ func TestProgressBarSmoothBlocks(t *testing.T) {
 
 func TestProgressBarComplete(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	c.ProgressBar(10, 10, "Done")
 	output := buf.String()
@@ -312,7 +312,7 @@ func TestProgressBarComplete(t *testing.T) {
 
 func TestProgressBarColoredPercentage(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
+	c := NewConsole(&buf, false, false, false) // noColor=false (colors enabled)
 
 	// Test 100% - should use green for percentage
 	c.ProgressBar(10, 10, "Testing")
@@ -340,7 +340,7 @@ func TestProgressBarColoredPercentage(t *testing.T) {
 
 func TestProgressBarGrayBrackets(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
+	c := NewConsole(&buf, false, false, false) // noColor=false (colors enabled)
 
 	c.ProgressBar(5, 10, "Testing")
 	output := buf.String()
@@ -355,7 +355,7 @@ func TestProgressBarGrayBrackets(t *testing.T) {
 
 func TestProgressBarGreenFill(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, false, false) // noColor=false (colors enabled)
+	c := NewConsole(&buf, false, false, false) // noColor=false (colors enabled)
 
 	c.ProgressBar(5, 10, "Testing")
 	output := buf.String()
@@ -367,7 +367,7 @@ func TestProgressBarGreenFill(t *testing.T) {
 
 func TestProgressBarEdgeCases(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	// current > total should clamp
 	c.ProgressBar(15, 10, "Testing")
@@ -387,7 +387,7 @@ func TestProgressBarEdgeCases(t *testing.T) {
 
 func TestProgressBarConsistentWidth(t *testing.T) {
 	var buf bytes.Buffer
-	c := NewConsole(&buf, true, false)
+	c := NewConsole(&buf, true, false, false)
 
 	// Render at different progress values and verify consistent visible width
 	var widths []int
