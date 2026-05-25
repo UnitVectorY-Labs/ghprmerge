@@ -12,6 +12,9 @@ Use case: merging automated dependency update pull requests (e.g., Dependabot) w
 # Set your GitHub token
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 
+# Optionally set the org as an environment variable (or use --org flag)
+export GITHUB_ORG=myorg
+
 # Check version
 ghprmerge --version
 
