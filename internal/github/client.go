@@ -342,7 +342,7 @@ func (c *RealClient) UpdateBranch(ctx context.Context, owner, repo string, prNum
 // PostRebaseComment posts a rebase comment on a pull request for Dependabot.
 func (c *RealClient) PostRebaseComment(ctx context.Context, owner, repo string, prNumber int) error {
 	comment := &github.IssueComment{
-		Body: github.String("@dependabot rebase"),
+		Body: new("@dependabot rebase"),
 	}
 	_, _, err := c.client.Issues.CreateComment(ctx, owner, repo, prNumber, comment)
 	if err != nil {
