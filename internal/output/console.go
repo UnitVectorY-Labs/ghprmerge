@@ -110,10 +110,7 @@ func (c *Console) ProgressBar(current, total int, label string) {
 	// Layout: "\r" + "  " (2) + label + "  " (2) + counter + " " (1) + "[" (1) + bar + "]" (1) + " " (1) + pct (4)
 	counterWidth := tw + 1 + digitCount(total)                          // current digits + "/" + total digits
 	fixedWidth := 2 + len(label) + 2 + counterWidth + 1 + 1 + 1 + 1 + 4 // spaces, label, counter, brackets, pct
-	barWidth := defaultTermWidth - fixedWidth
-	if barWidth < minBarWidth {
-		barWidth = minBarWidth
-	}
+	barWidth := max(defaultTermWidth-fixedWidth, minBarWidth)
 
 	// Compute filled portion using eighths for smooth partial steps.
 	filledEighths := (current * barWidth * 8) / total
@@ -192,7 +189,7 @@ func (c *Console) ClearCurrentLine() {
 
 // ClearLines clears n lines above the current position using ANSI escape codes.
 func (c *Console) ClearLines(n int) {
-	for i := 0; i < n; i++ {
+	for range n {
 		fmt.Fprint(c.w, "\033[A\033[2K")
 	}
 }

@@ -282,7 +282,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	// Parse source-branch-prefix into a slice
 	var prefixes []string
 	if sourceBranchPrefixStr != "" {
-		for _, p := range strings.Split(sourceBranchPrefixStr, ",") {
+		for p := range strings.SplitSeq(sourceBranchPrefixStr, ",") {
 			trimmed := strings.TrimSpace(p)
 			if trimmed != "" {
 				prefixes = append(prefixes, trimmed)

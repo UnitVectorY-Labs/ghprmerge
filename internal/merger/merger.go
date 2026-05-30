@@ -4,6 +4,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -486,13 +487,7 @@ func (m *Merger) discoverRepositories(ctx context.Context) ([]gh.Repository, err
 	for _, repo := range allRepos {
 		// If specific repos are specified, filter by them
 		if len(m.config.Repos) > 0 {
-			found := false
-			for _, r := range m.config.Repos {
-				if r == repo.Name {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(m.config.Repos, repo.Name)
 			if !found {
 				continue
 			}
