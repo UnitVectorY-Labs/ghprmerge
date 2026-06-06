@@ -142,7 +142,7 @@ func (c *Console) ProgressBar(current, total int, label string) {
 
 	// Assemble the line.
 	var b strings.Builder
-	b.WriteString("\r  ")
+	b.WriteString("\r\033[2K  ")
 	b.WriteString(c.color(colorCyan, label))
 	b.WriteString("  ")
 	b.WriteString(c.color(colorGray, counterStr))
