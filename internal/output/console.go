@@ -3,7 +3,10 @@ package output
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // ANSI color codes
@@ -28,6 +31,17 @@ const minBarWidth = 10
 
 // defaultTermWidth is the assumed terminal width when detection is not available.
 const defaultTermWidth = 80
+
+// terminalWidth returns the width of the terminal for the given writer.
+// If w is not a terminal or width cannot be determined, it returns defaultTermWidth.
+func terminalWidth(w io.Writer) int {
+	if f, ok := w.(*os.File); ok {
+		if width, _, err := term.GetSize(int(f.Fd())); err == nil && width > 0 {
+			return width
+		}
+	}
+	return defaultTermWidth
+}
 
 // Console handles colored, formatted terminal output with progress bar support.
 type Console struct {
@@ -110,7 +124,7 @@ func (c *Console) ProgressBar(current, total int, label string) {
 	// Layout: "\r" + "  " (2) + label + "  " (2) + counter + " " (1) + "[" (1) + bar + "]" (1) + " " (1) + pct (4)
 	counterWidth := tw + 1 + digitCount(total)                          // current digits + "/" + total digits
 	fixedWidth := 2 + len(label) + 2 + counterWidth + 1 + 1 + 1 + 1 + 4 // spaces, label, counter, brackets, pct
-	barWidth := max(defaultTermWidth-fixedWidth, minBarWidth)
+	barWidth := max(terminalWidth(c.w)-fixedWidth, minBarWidth)
 
 	// Compute filled portion using eighths for smooth partial steps.
 	filledEighths := (current * barWidth * 8) / total
