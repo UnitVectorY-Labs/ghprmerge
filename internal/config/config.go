@@ -258,7 +258,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
 			defaultMinGroupSize := 2
 			if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
-				fmt.Sscanf(v, "%d", &defaultMinGroupSize)
+				n, err := fmt.Sscan(v, &defaultMinGroupSize)
+				if err != nil || n != 1 {
+					return nil, fmt.Errorf("invalid GHPRMERGE_MIN_GROUP_SIZE value %q: must be a positive integer", v)
+				}
 			}
 			subFS.Int("min-group-size", defaultMinGroupSize, "Minimum number of PRs in a group to include in report")
 			subFS.String("verbosity", "", "Report output verbosity: brief, standard, or verbose")
@@ -275,12 +278,11 @@ func ParseFlags(args []string, version string) (*Config, error) {
 				sourceBranchPrefixStr = f.Value.String()
 			}
 			if f := subFS.Lookup("min-group-size"); f != nil {
-				fmt.Sscanf(f.Value.String(), "%d", &minGroupSize)
+				if _, err := fmt.Sscan(f.Value.String(), &minGroupSize); err != nil {
+					minGroupSize = 2
+				}
 			} else {
 				minGroupSize = 2
-				if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
-					fmt.Sscanf(v, "%d", &minGroupSize)
-				}
 			}
 			if f := subFS.Lookup("verbosity"); f != nil {
 				verbosity = f.Value.String()
