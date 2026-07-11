@@ -260,7 +260,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
 				n, err := fmt.Sscan(v, &defaultMinGroupSize)
 				if err != nil || n != 1 || defaultMinGroupSize < 1 {
-					return nil, fmt.Errorf("invalid GHPRMERGE_MIN_GROUP_SIZE value %q: must be a positive integer", v)
+					return nil, fmt.Errorf("invalid GHPRMERGE_MIN_GROUP_SIZE value %q: must be a positive integer (1 or greater)", v)
 				}
 			}
 			subFS.Int("min-group-size", defaultMinGroupSize, "Minimum number of PRs in a group to include in report")
@@ -277,10 +277,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			if f := subFS.Lookup("source-branch-prefix"); f != nil {
 				sourceBranchPrefixStr = f.Value.String()
 			}
-			// min-group-size is always registered for CommandReport; flag has already
-			// validated the value is a valid integer, so parse errors are not expected.
+			// min-group-size is always registered for CommandReport; flag.Int ensures
+			// the value is a valid integer. Range validation (>= 1) is enforced by Config.Validate().
 			if f := subFS.Lookup("min-group-size"); f != nil {
-				fmt.Sscan(f.Value.String(), &minGroupSize) //nolint:errcheck // flag ensures valid int
+				fmt.Sscan(f.Value.String(), &minGroupSize) //nolint:errcheck // flag.Int ensures valid int
 			} else {
 				minGroupSize = 2
 			}
