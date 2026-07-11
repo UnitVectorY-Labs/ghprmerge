@@ -577,6 +577,11 @@ func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) (
 			continue
 		}
 
+		// Apply author filter if specified
+		if m.config.Author != "" && pr.Author != m.config.Author {
+			continue
+		}
+
 		prs = append(prs, pr)
 	}
 

@@ -77,6 +77,7 @@ type Config struct {
 	MinGroupSize       int
 	Verbosity          string
 	Command            Command
+	Author             string
 }
 
 // IsAnalysisOnly returns true if neither rebase nor merge subcommand is used.
@@ -201,6 +202,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	noColor := globalFS.Bool("no-color", false, "Disable colored output")
 	noProgress := globalFS.Bool("no-progress", false, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
 	showVersion := globalFS.Bool("version", false, "Show version information and exit")
+	author := globalFS.String("author", os.Getenv("GHPRMERGE_AUTHOR"), "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
 
 	var globalRepos StringSliceFlag
 	globalFS.Var(&globalRepos, "repo", "Limit execution to specific repositories (may be repeated)")
@@ -254,7 +256,11 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		case CommandReport:
 			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
-			subFS.Int("min-group-size", 2, "Minimum number of PRs in a group to include in report")
+			defaultMinGroupSize := 2
+			if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
+				fmt.Sscanf(v, "%d", &defaultMinGroupSize)
+			}
+			subFS.Int("min-group-size", defaultMinGroupSize, "Minimum number of PRs in a group to include in report")
 			subFS.String("verbosity", "", "Report output verbosity: brief, standard, or verbose")
 			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		}
@@ -272,6 +278,9 @@ func ParseFlags(args []string, version string) (*Config, error) {
 				fmt.Sscanf(f.Value.String(), "%d", &minGroupSize)
 			} else {
 				minGroupSize = 2
+				if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
+					fmt.Sscanf(v, "%d", &minGroupSize)
+				}
 			}
 			if f := subFS.Lookup("verbosity"); f != nil {
 				verbosity = f.Value.String()
@@ -323,6 +332,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		MinGroupSize:       minGroupSize,
 		Verbosity:          verbosity,
 		Command:            command,
+		Author:             *author,
 	}, nil
 }
 

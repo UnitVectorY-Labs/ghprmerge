@@ -33,6 +33,7 @@ type PullRequest struct {
 	HeadSHA      string
 	RepoName     string
 	RepoFullName string
+	Author       string
 }
 
 // CheckStatus represents the overall status of checks on a commit.
@@ -165,6 +166,7 @@ func (c *RealClient) ListPullRequests(ctx context.Context, owner, repo, defaultB
 				HeadSHA:      pr.GetHead().GetSHA(),
 				RepoName:     repo,
 				RepoFullName: fmt.Sprintf("%s/%s", owner, repo),
+				Author:       pr.GetUser().GetLogin(),
 			})
 		}
 
@@ -196,6 +198,7 @@ func (c *RealClient) GetPullRequest(ctx context.Context, owner, repo string, num
 		HeadSHA:      pr.GetHead().GetSHA(),
 		RepoName:     repo,
 		RepoFullName: fmt.Sprintf("%s/%s", owner, repo),
+		Author:       pr.GetUser().GetLogin(),
 	}, nil
 }
 

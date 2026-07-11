@@ -202,6 +202,13 @@ Require at least 3 PRs in a group:
 ghprmerge --org myorg report --min-group-size 3
 ```
 
+The minimum group size can also be set via the `GHPRMERGE_MIN_GROUP_SIZE` environment variable:
+
+```bash
+export GHPRMERGE_MIN_GROUP_SIZE=3
+ghprmerge --org myorg report
+```
+
 Get JSON output for scripting:
 
 ```bash
@@ -233,6 +240,35 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 export GITHUB_ORG=myorg
 
 ghprmerge merge --source-branch dependabot/
+```
+
+## Filter by Author
+
+Filter pull requests to only those opened by a specific author. This works with all subcommands.
+
+Merge only PRs opened by the Dependabot app:
+
+```bash
+ghprmerge --org myorg --author app/dependabot merge --source-branch dependabot/
+```
+
+Rebase only PRs opened by a specific user:
+
+```bash
+ghprmerge --org myorg --author JaredHatfield rebase --source-branch feature/
+```
+
+Report on PRs from a specific author:
+
+```bash
+ghprmerge --org myorg --author app/dependabot report
+```
+
+The `--author` flag can also be set via the `GHPRMERGE_AUTHOR` environment variable:
+
+```bash
+export GHPRMERGE_AUTHOR=app/dependabot
+ghprmerge --org myorg merge --source-branch dependabot/
 ```
 
 ## Complete Production Workflow

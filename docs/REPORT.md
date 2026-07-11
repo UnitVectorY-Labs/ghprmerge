@@ -28,6 +28,7 @@ These flags are placed before the `report` subcommand.
 | `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
 | `--repo` | - | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
+| `--author` | `GHPRMERGE_AUTHOR` env | Filter pull requests by author login (e.g. `app/dependabot` or a GitHub username) |
 | `--json` | `false` | Output structured JSON |
 | `--verbose` | `false` | Show all repos including those with no matching PRs |
 | `--no-color` | `false` | Disable colored output |
@@ -39,7 +40,7 @@ These flags are placed after the `report` subcommand.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--source-branch-prefix` | - | Comma-separated list of branch prefixes to include in report |
-| `--min-group-size` | `2` | Minimum number of PRs in a group to include in report |
+| `--min-group-size` | `2` (`GHPRMERGE_MIN_GROUP_SIZE` env) | Minimum number of PRs in a group to include in report |
 | `--verbosity` | `standard` | Report output verbosity: `brief`, `standard`, or `verbose` |
 | `--repo` | - | Additional repo filter, in addition to the global `--repo` (repeatable) |
 
@@ -197,6 +198,20 @@ Scan the organization and show all grouped PRs:
 
 ```bash
 ghprmerge --org myorg report
+```
+
+### Filter by author
+
+Show only PRs opened by `app/dependabot`:
+
+```bash
+ghprmerge --org myorg --author app/dependabot report
+```
+
+Show only PRs opened by a specific user:
+
+```bash
+ghprmerge --org myorg --author JaredHatfield report
 ```
 
 ### Filter by branch prefix
