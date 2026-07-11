@@ -26,6 +26,7 @@ These flags are placed before the subcommand and work with all commands.
 | `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
 | `--repo` | - | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
+| `--author` | `GHPRMERGE_AUTHOR` env | Filter pull requests by author login (e.g. `app/dependabot` or a GitHub username) |
 | `--json` | `false` | Output structured JSON |
 | `--verbose` | `false` | Stream repository results during scanning, including repos with no matching pull requests |
 | `--no-color` | `false` | Disable colored output |
@@ -68,6 +69,8 @@ If you omit a subcommand and required command-specific flags, the error message 
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub personal access token (preferred) |
 | `GITHUB_ORG` | Default organization (can be overridden by `--org`) |
+| `GHPRMERGE_AUTHOR` | Default author filter (can be overridden by `--author`) |
+| `GHPRMERGE_MIN_GROUP_SIZE` | Default minimum group size for the `report` command (can be overridden by `--min-group-size`) |
 
 ## Authentication
 

@@ -77,6 +77,7 @@ type Config struct {
 	MinGroupSize       int
 	Verbosity          string
 	Command            Command
+	Author             string
 }
 
 // IsAnalysisOnly returns true if neither rebase nor merge subcommand is used.
@@ -201,6 +202,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	noColor := globalFS.Bool("no-color", false, "Disable colored output")
 	noProgress := globalFS.Bool("no-progress", false, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
 	showVersion := globalFS.Bool("version", false, "Show version information and exit")
+	author := globalFS.String("author", os.Getenv("GHPRMERGE_AUTHOR"), "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
 
 	var globalRepos StringSliceFlag
 	globalFS.Var(&globalRepos, "repo", "Limit execution to specific repositories (may be repeated)")
@@ -254,7 +256,14 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		case CommandReport:
 			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
-			subFS.Int("min-group-size", 2, "Minimum number of PRs in a group to include in report")
+			defaultMinGroupSize := 2
+			if v := os.Getenv("GHPRMERGE_MIN_GROUP_SIZE"); v != "" {
+				n, err := fmt.Sscan(v, &defaultMinGroupSize)
+				if err != nil || n != 1 || defaultMinGroupSize < 1 {
+					return nil, fmt.Errorf("invalid GHPRMERGE_MIN_GROUP_SIZE value %q: must be a positive integer (1 or greater)", v)
+				}
+			}
+			subFS.Int("min-group-size", defaultMinGroupSize, "Minimum number of PRs in a group to include in report")
 			subFS.String("verbosity", "", "Report output verbosity: brief, standard, or verbose")
 			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		}
@@ -268,8 +277,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			if f := subFS.Lookup("source-branch-prefix"); f != nil {
 				sourceBranchPrefixStr = f.Value.String()
 			}
+			// min-group-size is always registered for CommandReport; flag.Int ensures
+			// the value is a valid integer. Range validation (>= 1) is enforced by Config.Validate().
 			if f := subFS.Lookup("min-group-size"); f != nil {
-				fmt.Sscanf(f.Value.String(), "%d", &minGroupSize)
+				fmt.Sscan(f.Value.String(), &minGroupSize) //nolint:errcheck // flag.Int ensures valid int
 			} else {
 				minGroupSize = 2
 			}
@@ -323,6 +334,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		MinGroupSize:       minGroupSize,
 		Verbosity:          verbosity,
 		Command:            command,
+		Author:             *author,
 	}, nil
 }
 

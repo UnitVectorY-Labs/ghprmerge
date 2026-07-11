@@ -85,6 +85,11 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 				}
 			}
 
+			// Apply author filter if specified
+			if m.config.Author != "" && pr.Author != m.config.Author {
+				continue
+			}
+
 			allPRs = append(allPRs, prEntry{
 				repoName: repo.Name,
 				pr:       pr,

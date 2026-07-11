@@ -28,6 +28,7 @@ These flags are placed before the `merge` subcommand.
 | `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
 | `--repo` | - | Limit to specific repositories (repeatable) |
 | `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
+| `--author` | `GHPRMERGE_AUTHOR` env | Filter pull requests by author login (e.g. `app/dependabot` or a GitHub username) |
 | `--json` | `false` | Output structured JSON |
 | `--verbose` | `false` | Show all repos including those with no matching PRs |
 | `--no-color` | `false` | Disable colored output |
@@ -133,6 +134,20 @@ Merge all ready Dependabot PRs across the organization:
 
 ```bash
 ghprmerge --org myorg merge --source-branch dependabot/
+```
+
+### Merge by author
+
+Merge only PRs opened by `app/dependabot`:
+
+```bash
+ghprmerge --org myorg --author app/dependabot merge --source-branch dependabot/
+```
+
+Merge only PRs opened by a specific user:
+
+```bash
+ghprmerge --org myorg --author JaredHatfield merge --source-branch feature/
 ```
 
 ### Merge specific repos
