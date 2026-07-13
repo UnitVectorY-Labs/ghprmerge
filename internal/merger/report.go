@@ -28,7 +28,7 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 	}
 
 	repoCount := 0
-	showProgress := m.console != nil && !m.config.JSON && len(repos) > 0
+	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && len(repos) > 0
 
 	// Collect all open PRs from all repositories
 	type prEntry struct {

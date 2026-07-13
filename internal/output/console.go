@@ -202,7 +202,11 @@ func (c *Console) ClearCurrentLine() {
 }
 
 // ClearLines clears n lines above the current position using ANSI escape codes.
+// It is a no-op when noProgress is set.
 func (c *Console) ClearLines(n int) {
+	if c.noProgress {
+		return
+	}
 	for range n {
 		fmt.Fprint(c.w, "\033[A\033[2K")
 	}

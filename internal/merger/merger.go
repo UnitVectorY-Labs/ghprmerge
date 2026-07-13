@@ -80,7 +80,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 	}
 
 	repoCount := 0
-	showProgress := m.console != nil && !m.config.JSON && len(repos) > 0
+	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && len(repos) > 0
 
 	// Process each repository sequentially
 	for i, repo := range repos {
@@ -184,7 +184,7 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	}
 
 	actionNum := 0
-	showProgress := m.console != nil && !m.config.JSON && totalActions > 0
+	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && totalActions > 0
 
 	// Process each repository and execute pending actions
 	for i := range scanResult.Repositories {
