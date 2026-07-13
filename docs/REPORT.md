@@ -12,37 +12,45 @@ The `report` subcommand scans open pull requests across repositories in a GitHub
 ## Synopsis
 
 ```
-ghprmerge [global-flags] report [report-flags]
+ghprmerge report --org <organization> [flags]
 ```
 
 The report subcommand discovers repositories using the same logic as the `merge` and `rebase` subcommands, collects all open PRs (non-draft, targeting the default branch), and groups them by exact source branch name. Groups are sorted by descending PR count, with ties broken by ascending branch name. This is useful for identifying batches of related PRs (e.g., Dependabot updates for the same dependency) that can be merged or rebased together.
 
-## Flags
-
-### Global Flags
-
-These flags are placed before the `report` subcommand.
+## Required Setup
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
-| `--repo` | - | Limit to specific repositories (repeatable) |
-| `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
-| `--author` | `GHPRMERGE_AUTHOR` env | Filter pull requests by author login (e.g. `app/dependabot` or a GitHub username) |
-| `--json` | `false` | Output structured JSON |
-| `--verbose` | `false` | Show all repos including those with no matching PRs |
-| `--no-color` | `false` | Disable colored output |
+| `--org <organization>` | `GITHUB_ORG` env | GitHub organization to scan. Required unless `GITHUB_ORG` is set. |
 
-### Report Flags
+## Filtering and Execution Controls
 
-These flags are placed after the `report` subcommand.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
+| `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
+| `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+
+## Output Controls
+
+All output flags can be used with `report`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | `false` | Output structured JSON instead of human-readable text. |
+| `--verbose` | `false` | Show repositories with no matching PRs as they are scanned. |
+| `--no-color` | `false` | Disable ANSI color output. |
+| `--no-progress` | `false` | Suppress progress-bar output for CI or scripts. |
+
+## Report Flags
+
+These flags are placed after `report`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--source-branch-prefix` | - | Comma-separated list of branch prefixes to include in report |
 | `--min-group-size` | `2` (`GHPRMERGE_MIN_GROUP_SIZE` env) | Minimum number of PRs in a group to include in report |
 | `--verbosity` | `standard` | Report output verbosity: `brief`, `standard`, or `verbose` |
-| `--repo` | - | Additional repo filter, in addition to the global `--repo` (repeatable) |
 
 **Flag restrictions**: The flags `--source-branch`, `--skip-rebase`, and `--confirm` cannot be used with the `report` subcommand. These flags are specific to `merge` and `rebase`.
 
@@ -197,7 +205,7 @@ This can happen when:
 Scan the organization and show all grouped PRs:
 
 ```bash
-ghprmerge --org myorg report
+ghprmerge report --org myorg
 ```
 
 ### Filter by author
@@ -205,13 +213,13 @@ ghprmerge --org myorg report
 Show only PRs opened by `app/dependabot`:
 
 ```bash
-ghprmerge --org myorg --author app/dependabot report
+ghprmerge report --author app/dependabot --org myorg
 ```
 
 Show only PRs opened by a specific user:
 
 ```bash
-ghprmerge --org myorg --author JaredHatfield report
+ghprmerge report --author JaredHatfield --org myorg
 ```
 
 ### Filter by branch prefix
@@ -219,7 +227,7 @@ ghprmerge --org myorg --author JaredHatfield report
 Show only Dependabot Go module updates:
 
 ```bash
-ghprmerge --org myorg report --source-branch-prefix dependabot/go_modules/
+ghprmerge report --org myorg --source-branch-prefix dependabot/go_modules/
 ```
 
 ### Filter by multiple prefixes
@@ -227,7 +235,7 @@ ghprmerge --org myorg report --source-branch-prefix dependabot/go_modules/
 Show Dependabot updates for both Go and npm:
 
 ```bash
-ghprmerge --org myorg report --source-branch-prefix dependabot/go_modules/,dependabot/npm_and_yarn/
+ghprmerge report --org myorg --source-branch-prefix dependabot/go_modules/,dependabot/npm_and_yarn/
 ```
 
 ### Include single-PR groups
@@ -235,7 +243,7 @@ ghprmerge --org myorg report --source-branch-prefix dependabot/go_modules/,depen
 Lower the minimum group size to include branches with only one PR:
 
 ```bash
-ghprmerge --org myorg report --min-group-size 1
+ghprmerge report --org myorg --min-group-size 1
 ```
 
 ### Brief output
@@ -243,7 +251,7 @@ ghprmerge --org myorg report --min-group-size 1
 Show only branch names and counts:
 
 ```bash
-ghprmerge --org myorg report --verbosity brief
+ghprmerge report --org myorg --verbosity brief
 ```
 
 ### Verbose output
@@ -251,7 +259,7 @@ ghprmerge --org myorg report --verbosity brief
 Show branch names, counts, statuses, and PR titles:
 
 ```bash
-ghprmerge --org myorg report --verbosity verbose
+ghprmerge report --org myorg --verbosity verbose
 ```
 
 ### Limit to specific repos
@@ -259,7 +267,7 @@ ghprmerge --org myorg report --verbosity verbose
 Report on specific repositories only:
 
 ```bash
-ghprmerge --org myorg --repo repo-a --repo repo-b report
+ghprmerge report --org myorg --repo repo-a --repo repo-b
 ```
 
 ### JSON output for scripting
@@ -267,7 +275,7 @@ ghprmerge --org myorg --repo repo-a --repo repo-b report
 Get structured output for automation pipelines:
 
 ```bash
-ghprmerge --org myorg --json report | jq '.groups[] | select(.count >= 5)'
+ghprmerge report --json --org myorg | jq '.groups[] | select(.count >= 5)'
 ```
 
 ### Combine with repo limit
@@ -275,7 +283,7 @@ ghprmerge --org myorg --json report | jq '.groups[] | select(.count >= 5)'
 Scan at most 20 repositories:
 
 ```bash
-ghprmerge --org myorg --repo-limit 20 report
+ghprmerge report --repo-limit 20 --org myorg
 ```
 
 ### Disable colored output
@@ -283,7 +291,7 @@ ghprmerge --org myorg --repo-limit 20 report
 Useful for CI environments or piping to a file:
 
 ```bash
-ghprmerge --org myorg --no-color report
+ghprmerge report --no-color --org myorg
 ```
 
 ### Identify PRs ready to merge
@@ -291,7 +299,7 @@ ghprmerge --org myorg --no-color report
 Use JSON output to find groups where all PRs are passing:
 
 ```bash
-ghprmerge --org myorg --json report | jq '
+ghprmerge report --json --org myorg | jq '
   .groups[] | select(
     all(.pullRequests[]; .status == "passing")
   )
@@ -304,8 +312,8 @@ Use the report to identify a branch, then merge it:
 
 ```bash
 # Step 1: Find grouped branches
-ghprmerge --org myorg report --verbosity brief
+ghprmerge report --org myorg --verbosity brief
 
 # Step 2: Merge a specific branch from the report
-ghprmerge --org myorg merge --source-branch dependabot/go_modules/foo-1.2.3
+ghprmerge merge --org myorg --source-branch dependabot/go_modules/foo-1.2.3
 ```
