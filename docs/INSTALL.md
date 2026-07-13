@@ -72,14 +72,14 @@ ghprmerge --help
 
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-ghprmerge --org myorg --source-branch dependabot/
+ghprmerge merge --org myorg --source-branch dependabot/
 ```
 
 ### Using GitHub CLI
 
 ```bash
 gh auth login
-ghprmerge --org myorg --source-branch dependabot/
+ghprmerge merge --org myorg --source-branch dependabot/
 ```
 
 The tool will automatically use the token from `gh auth token` if `GITHUB_TOKEN` is not set.

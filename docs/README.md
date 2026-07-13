@@ -19,6 +19,8 @@ The tool provides three subcommands:
 
 The built-in CLI help (`ghprmerge --help`) includes these subcommand descriptions so users and automation agents can quickly select the correct mode without opening external documentation.
 
+For every execution mode, place the subcommand first, then its flags (for example, `ghprmerge merge --org myorg --repo repo1 ...`). `GITHUB_ORG` remains available as the default when `--org` is omitted.
+
 ## Safety Model
 
 ghprmerge is designed to be **safe by default**:

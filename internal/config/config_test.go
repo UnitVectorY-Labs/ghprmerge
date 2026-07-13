@@ -1,12 +1,87 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"testing"
 )
+
+func TestRootHelpDocumentsCommandsFlagsAndEnvironment(t *testing.T) {
+	var output bytes.Buffer
+	printGlobalUsage(&output, nil)
+
+	for _, expected := range []string{
+		"merge  merge ready pull requests",
+		"rebase update pull request branches",
+		"report scan open pull requests",
+		"Required setup:",
+		"--org <organization>",
+		"--repo <repository>",
+		"Filtering and execution flags:",
+		"Output flags:",
+		"Environment variables:",
+		"GITHUB_TOKEN",
+		"GITHUB_ORG",
+	} {
+		if !contains(output.String(), expected) {
+			t.Errorf("root help does not contain %q:\n%s", expected, output.String())
+		}
+	}
+}
+
+func TestSubcommandHelpDocumentsBehaviorGlobalAndCommandFlags(t *testing.T) {
+	tests := []struct {
+		command  Command
+		expected []string
+	}{
+		{
+			command: CommandMerge,
+			expected: []string{
+				"merges only those that are ready",
+				"--source-branch <pattern>",
+				"--skip-rebase",
+			},
+		},
+		{
+			command: CommandRebase,
+			expected: []string{
+				"updates branches that are behind",
+				"--source-branch <pattern>",
+				"--confirm",
+			},
+		},
+		{
+			command: CommandReport,
+			expected: []string{
+				"report is read-only",
+				"--source-branch-prefix <prefixes>",
+				"--min-group-size <n>",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.command), func(t *testing.T) {
+			var output bytes.Buffer
+			printSubcommandUsage(&output, tt.command, nil)
+
+			for _, expected := range append(tt.expected,
+				"--org <organization>",
+				"--repo <repository>",
+				"--author <login>",
+				"--json",
+				"GITHUB_TOKEN",
+			) {
+				if !contains(output.String(), expected) {
+					t.Errorf("%s help does not contain %q:\n%s", tt.command, expected, output.String())
+				}
+			}
+		})
+	}
+}
 
 func TestParseFlags(t *testing.T) {
 	origToken := os.Getenv("GITHUB_TOKEN")
@@ -39,7 +114,7 @@ func TestParseFlags(t *testing.T) {
 	}{
 		{
 			name:          "rebase subcommand with json and limit",
-			args:          []string{"--org", "myorg", "--repo-limit", "10", "--json", "rebase", "--source-branch", "dependabot/"},
+			args:          []string{"rebase", "--org", "myorg", "--repo-limit", "10", "--json", "--source-branch", "dependabot/"},
 			envToken:      "test-token",
 			wantOrg:       "myorg",
 			wantBranch:    "dependabot/",
@@ -52,8 +127,9 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "no subcommand defaults",
-			args:        []string{"--org", "myorg"},
+			args:        nil,
 			envToken:    "test-token",
+			envOrg:      "myorg",
 			wantOrg:     "myorg",
 			wantRebase:  false,
 			wantMerge:   false,
@@ -71,8 +147,8 @@ func TestParseFlags(t *testing.T) {
 			wantCommand: CommandMerge,
 		},
 		{
-			name:        "multiple global repos",
-			args:        []string{"--org", "myorg", "--repo", "repo1", "--repo", "repo2", "merge", "--source-branch", "test"},
+			name:        "multiple command repos",
+			args:        []string{"merge", "--org", "myorg", "--repo", "repo1", "--repo", "repo2", "--source-branch", "test"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "test",
@@ -81,18 +157,28 @@ func TestParseFlags(t *testing.T) {
 			wantCommand: CommandMerge,
 		},
 		{
-			name:        "repos from both global and subcommand",
-			args:        []string{"--org", "myorg", "--repo", "repo1", "merge", "--source-branch", "test", "--repo", "repo2"},
+			name:        "repos can surround other command flags",
+			args:        []string{"merge", "--repo", "repo1", "--org", "myorg", "--source-branch", "test", "--repo", "repo2"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "test",
 			wantRepos:   []string{"repo1", "repo2"},
 			wantMerge:   true,
 			wantCommand: CommandMerge,
+		},
+		{
+			name:        "repo under rebase command",
+			args:        []string{"rebase", "--org", "myorg", "--repo", "repo1", "--source-branch", "test"},
+			envToken:    "test-token",
+			wantOrg:     "myorg",
+			wantBranch:  "test",
+			wantRepos:   []string{"repo1"},
+			wantRebase:  true,
+			wantCommand: CommandRebase,
 		},
 		{
 			name:        "rebase subcommand",
-			args:        []string{"--org", "myorg", "rebase", "--source-branch", "dependabot/"},
+			args:        []string{"rebase", "--org", "myorg", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -102,7 +188,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "merge subcommand",
-			args:        []string{"--org", "myorg", "merge", "--source-branch", "dependabot/"},
+			args:        []string{"merge", "--org", "myorg", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -112,7 +198,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:           "merge subcommand with skip-rebase",
-			args:           []string{"--org", "myorg", "merge", "--source-branch", "dependabot/", "--skip-rebase"},
+			args:           []string{"merge", "--org", "myorg", "--source-branch", "dependabot/", "--skip-rebase"},
 			envToken:       "test-token",
 			wantOrg:        "myorg",
 			wantBranch:     "dependabot/",
@@ -122,7 +208,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "verbose global flag",
-			args:        []string{"--org", "myorg", "--verbose", "merge", "--source-branch", "dependabot/"},
+			args:        []string{"merge", "--org", "myorg", "--verbose", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -132,7 +218,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "no-color global flag",
-			args:        []string{"--org", "myorg", "--no-color", "rebase", "--source-branch", "dependabot/"},
+			args:        []string{"rebase", "--org", "myorg", "--no-color", "--source-branch", "dependabot/"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -142,7 +228,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:         "multiple source-branch flags",
-			args:         []string{"--org", "myorg", "merge", "--source-branch", "dep/", "--source-branch", "repver/"},
+			args:         []string{"merge", "--org", "myorg", "--source-branch", "dep/", "--source-branch", "repver/"},
 			envToken:     "test-token",
 			wantOrg:      "myorg",
 			wantBranch:   "dep/",
@@ -152,7 +238,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "confirm flag under merge",
-			args:        []string{"--org", "myorg", "merge", "--source-branch", "dependabot/", "--confirm"},
+			args:        []string{"merge", "--org", "myorg", "--source-branch", "dependabot/", "--confirm"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -162,7 +248,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "confirm flag under rebase",
-			args:        []string{"--org", "myorg", "rebase", "--source-branch", "dependabot/", "--confirm"},
+			args:        []string{"rebase", "--org", "myorg", "--source-branch", "dependabot/", "--confirm"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantBranch:  "dependabot/",
@@ -172,7 +258,7 @@ func TestParseFlags(t *testing.T) {
 		},
 		{
 			name:        "report subcommand",
-			args:        []string{"--org", "myorg", "report"},
+			args:        []string{"report", "--org", "myorg"},
 			envToken:    "test-token",
 			wantOrg:     "myorg",
 			wantReport:  true,
@@ -266,7 +352,7 @@ func TestParseFlagsVersion(t *testing.T) {
 	}
 
 	// Version flag anywhere in args
-	_, err = ParseFlags([]string{"--org", "myorg", "--version"}, "1.0.0")
+	_, err = ParseFlags([]string{"merge", "--org", "myorg", "--version"}, "1.0.0")
 	if !errors.Is(err, ErrVersion) {
 		t.Fatalf("ParseFlags(--org myorg --version) error = %v, want ErrVersion", err)
 	}
@@ -277,8 +363,43 @@ func TestParseFlagsRejectsUnknownGlobalFlag(t *testing.T) {
 	defer os.Setenv("GITHUB_TOKEN", origToken)
 	os.Setenv("GITHUB_TOKEN", "test-token")
 
-	if _, err := ParseFlags([]string{"--org", "myorg", "--quiet", "merge", "--source-branch", "dependabot/"}, "test"); err == nil {
+	if _, err := ParseFlags([]string{"merge", "--org", "myorg", "--quiet", "--source-branch", "dependabot/"}, "test"); err == nil {
 		t.Fatal("ParseFlags() expected error for unknown --quiet flag")
+	}
+}
+
+func TestParseFlagsRejectsOrgBeforeSubcommand(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	origOrg := os.Getenv("GITHUB_ORG")
+	defer func() {
+		os.Setenv("GITHUB_TOKEN", origToken)
+		os.Setenv("GITHUB_ORG", origOrg)
+	}()
+	os.Setenv("GITHUB_TOKEN", "test-token")
+	os.Setenv("GITHUB_ORG", "")
+
+	if _, err := ParseFlags([]string{"--org", "myorg", "merge", "--source-branch", "dependabot/"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected --org before the subcommand to be rejected")
+	}
+}
+
+func TestParseFlagsRejectsRepoBeforeSubcommand(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
+
+	if _, err := ParseFlags([]string{"--repo", "repo1", "merge", "--org", "myorg", "--source-branch", "dependabot/"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected --repo before the subcommand to be rejected")
+	}
+}
+
+func TestParseFlagsRejectsGlobalFlagsBeforeSubcommand(t *testing.T) {
+	origToken := os.Getenv("GITHUB_TOKEN")
+	defer os.Setenv("GITHUB_TOKEN", origToken)
+	os.Setenv("GITHUB_TOKEN", "test-token")
+
+	if _, err := ParseFlags([]string{"--json", "merge", "--org", "myorg", "--source-branch", "dependabot/"}, "test"); err == nil {
+		t.Fatal("ParseFlags() expected flags before the subcommand to be rejected")
 	}
 }
 
@@ -288,7 +409,7 @@ func TestParseFlagsRejectsUnknownSubcommandFlag(t *testing.T) {
 	os.Setenv("GITHUB_TOKEN", "test-token")
 
 	// --skip-rebase is not valid under rebase subcommand
-	if _, err := ParseFlags([]string{"--org", "myorg", "rebase", "--source-branch", "dep/", "--skip-rebase"}, "test"); err == nil {
+	if _, err := ParseFlags([]string{"rebase", "--org", "myorg", "--source-branch", "dep/", "--skip-rebase"}, "test"); err == nil {
 		t.Fatal("ParseFlags() expected error for --skip-rebase under rebase subcommand")
 	}
 }
@@ -298,7 +419,7 @@ func TestParseFlagsRejectsUnknownSubcommand(t *testing.T) {
 	defer os.Setenv("GITHUB_TOKEN", origToken)
 	os.Setenv("GITHUB_TOKEN", "test-token")
 
-	cfg, err := ParseFlags([]string{"--org", "myorg", "shipit"}, "test")
+	cfg, err := ParseFlags([]string{"shipit"}, "test")
 	if err == nil {
 		t.Fatal("ParseFlags() expected error for unknown subcommand")
 	}
@@ -695,7 +816,7 @@ func TestParseFlagsReport(t *testing.T) {
 	os.Setenv("GITHUB_ORG", "")
 
 	// Test basic report subcommand
-	cfg, err := ParseFlags([]string{"--org", "myorg", "report"}, "test")
+	cfg, err := ParseFlags([]string{"report", "--org", "myorg"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
@@ -710,7 +831,7 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with source-branch-prefix
-	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--source-branch-prefix", "dependabot/,repver/"}, "test")
+	cfg, err = ParseFlags([]string{"report", "--org", "myorg", "--source-branch-prefix", "dependabot/,repver/"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
@@ -725,7 +846,7 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with min-group-size
-	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--min-group-size", "5"}, "test")
+	cfg, err = ParseFlags([]string{"report", "--org", "myorg", "--min-group-size", "5"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
@@ -734,7 +855,7 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with verbosity
-	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--verbosity", "brief"}, "test")
+	cfg, err = ParseFlags([]string{"report", "--org", "myorg", "--verbosity", "brief"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}
@@ -743,7 +864,7 @@ func TestParseFlagsReport(t *testing.T) {
 	}
 
 	// Test report with repo under subcommand
-	cfg, err = ParseFlags([]string{"--org", "myorg", "report", "--repo", "myrepo"}, "test")
+	cfg, err = ParseFlags([]string{"report", "--org", "myorg", "--repo", "myrepo"}, "test")
 	if err != nil {
 		t.Fatalf("ParseFlags() error = %v", err)
 	}

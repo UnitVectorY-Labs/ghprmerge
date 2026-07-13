@@ -156,7 +156,7 @@ var ErrVersion = errors.New("version requested")
 
 // ParseFlags parses command-line flags and environment variables.
 // Supports subcommands: merge, rebase, report
-// Usage: ghprmerge [global-flags] <command> [command-flags]
+// Usage: ghprmerge <command> [flags]
 func ParseFlags(args []string, version string) (*Config, error) {
 	if len(args) > 0 {
 		// Check for --version or --help before subcommand parsing
@@ -193,19 +193,19 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		globalArgs = args
 	}
 
-	// Parse global flags
-	globalFS := flag.NewFlagSet(commandName(), flag.ContinueOnError)
-	org := globalFS.String("org", os.Getenv("GITHUB_ORG"), "GitHub organization to scan")
-	repoLimit := globalFS.Int("repo-limit", 0, "Maximum number of repositories to process (0 = unlimited)")
-	jsonOutput := globalFS.Bool("json", false, "Output structured JSON instead of human-readable text")
-	verbose := globalFS.Bool("verbose", false, "Show all repositories including those with no matching pull requests")
-	noColor := globalFS.Bool("no-color", false, "Disable colored output")
-	noProgress := globalFS.Bool("no-progress", false, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
-	showVersion := globalFS.Bool("version", false, "Show version information and exit")
-	author := globalFS.String("author", os.Getenv("GHPRMERGE_AUTHOR"), "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
+	org := os.Getenv("GITHUB_ORG")
+	repoLimit := 0
+	jsonOutput := false
+	verbose := false
+	noColor := false
+	noProgress := false
+	author := os.Getenv("GHPRMERGE_AUTHOR")
 
-	var globalRepos StringSliceFlag
-	globalFS.Var(&globalRepos, "repo", "Limit execution to specific repositories (may be repeated)")
+	// Root-only flags are parsed before a subcommand. All operational flags are
+	// registered on the selected subcommand so they can be placed after it.
+	globalFS := flag.NewFlagSet(commandName(), flag.ContinueOnError)
+	showVersion := globalFS.Bool("version", false, "Show version information and exit")
+
 	globalFS.Usage = func() {
 		printGlobalUsage(globalFS.Output(), globalFS)
 	}
@@ -234,26 +234,30 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	var sourceBranchPrefixStr string
 	var minGroupSize int
 	var verbosity string
-
-	// Additional repos from subcommand flags
-	var subRepos StringSliceFlag
+	var repos StringSliceFlag
 
 	if command != CommandNone {
 		subFS := flag.NewFlagSet(string(command), flag.ContinueOnError)
 		subFS.Usage = func() {
 			printSubcommandUsage(subFS.Output(), command, subFS)
 		}
+		subFS.StringVar(&org, "org", org, "GitHub organization to scan")
+		subFS.Var(&repos, "repo", "Exact repository name in the organization to scan (may be repeated)")
+		subFS.IntVar(&repoLimit, "repo-limit", repoLimit, "Maximum number of repositories to process (0 = unlimited)")
+		subFS.BoolVar(&jsonOutput, "json", jsonOutput, "Output structured JSON instead of human-readable text")
+		subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
+		subFS.BoolVar(&noColor, "no-color", noColor, "Disable colored output")
+		subFS.BoolVar(&noProgress, "no-progress", noProgress, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
+		subFS.StringVar(&author, "author", author, "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
 
 		switch command {
 		case CommandMerge:
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
 			subFS.BoolVar(&skipRebase, "skip-rebase", false, "Skip rebase check and merge PRs that are behind")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
-			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		case CommandRebase:
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
-			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		case CommandReport:
 			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
 			defaultMinGroupSize := 2
@@ -265,7 +269,6 @@ func ParseFlags(args []string, version string) (*Config, error) {
 			}
 			subFS.Int("min-group-size", defaultMinGroupSize, "Minimum number of PRs in a group to include in report")
 			subFS.String("verbosity", "", "Report output verbosity: brief, standard, or verbose")
-			subFS.Var(&subRepos, "repo", "Limit execution to specific repositories (may be repeated)")
 		}
 
 		if err := subFS.Parse(subArgs); err != nil {
@@ -301,10 +304,6 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		}
 	}
 
-	// Merge repos from global and subcommand
-	allRepos := append([]string(nil), globalRepos...)
-	allRepos = append(allRepos, subRepos...)
-
 	// Resolve authentication token
 	token := resolveToken()
 
@@ -315,26 +314,26 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	}
 
 	return &Config{
-		Org:                *org,
+		Org:                org,
 		SourceBranches:     sourceBranches,
 		SourceBranch:       sourceBranch,
 		Rebase:             command == CommandRebase,
 		Merge:              command == CommandMerge,
 		SkipRebase:         skipRebase,
-		Repos:              allRepos,
-		RepoLimit:          *repoLimit,
-		JSON:               *jsonOutput,
+		Repos:              repos,
+		RepoLimit:          repoLimit,
+		JSON:               jsonOutput,
 		Confirm:            confirm,
-		Verbose:            *verbose,
-		NoColor:            *noColor,
-		NoProgress:         *noProgress,
+		Verbose:            verbose,
+		NoColor:            noColor,
+		NoProgress:         noProgress,
 		Token:              token,
 		Report:             command == CommandReport,
 		SourceBranchPrefix: prefixes,
 		MinGroupSize:       minGroupSize,
 		Verbosity:          verbosity,
 		Command:            command,
-		Author:             *author,
+		Author:             author,
 	}, nil
 }
 
@@ -360,25 +359,82 @@ func subcommandSummary() string {
 }
 
 func printGlobalUsage(w io.Writer, globalFS *flag.FlagSet) {
-	fmt.Fprintf(w, "Usage:\n  %s [global-flags] <command> [command-flags]\n\n", commandName())
+	fmt.Fprintf(w, "Usage:\n  %s <command> [flags]\n\n", commandName())
 	fmt.Fprintln(w, "Commands:")
 	fmt.Fprintln(w, subcommandSummary())
-	fmt.Fprintf(w, "\nUse '%s <command> --help' for command-specific flags.\n\n", commandName())
-	fmt.Fprintln(w, "Global flags:")
-	globalFS.PrintDefaults()
+	fmt.Fprintf(w, "\nUse '%s <command> --help' for each command's behavior and flags.\n", commandName())
+	printSharedCommandFlags(w)
+	printGlobalFlags(w)
+	printEnvironmentVariables(w)
 }
 
 func printSubcommandUsage(w io.Writer, command Command, subFS *flag.FlagSet) {
-	fmt.Fprintf(w, "Usage:\n  %s [global-flags] %s [command-flags]\n\n", commandName(), command)
-	for _, cmd := range commandDescriptions {
-		if cmd.Name == command {
-			fmt.Fprintf(w, "%s: %s\n\n", command, cmd.Description)
-			break
-		}
+	fmt.Fprintf(w, "Usage:\n  %s %s --org <organization> [flags]\n\n", commandName(), command)
+	fmt.Fprintf(w, "%s\n", commandHelpDescription(command))
+	printSharedCommandFlags(w)
+	printGlobalFlags(w)
+	printCommandFlags(w, command)
+	printEnvironmentVariables(w)
+	fmt.Fprintf(w, "\nRun '%s --help' to compare commands.\n", commandName())
+}
+
+func commandHelpDescription(command Command) string {
+	switch command {
+	case CommandMerge:
+		return "merge scans matching pull requests and merges only those that are ready: not drafts, targeting the default branch, conflict-free, up to date (unless --skip-rebase is set), and passing checks."
+	case CommandRebase:
+		return "rebase scans matching pull requests and updates branches that are behind their repositories' default branch. It does not merge pull requests."
+	case CommandReport:
+		return "report is read-only: it scans open pull requests, groups them by source branch, and reports the matching groups. It never merges or rebases."
+	default:
+		return ""
 	}
-	fmt.Fprintln(w, "Command flags:")
-	subFS.PrintDefaults()
-	fmt.Fprintf(w, "\nRun '%s --help' to see all commands and global flags.\n", commandName())
+}
+
+func printSharedCommandFlags(w io.Writer) {
+	fmt.Fprintln(w, "\nRequired setup:")
+	fmt.Fprintln(w, "  --org <organization>       GitHub organization to scan. Required unless GITHUB_ORG is set.")
+	fmt.Fprintln(w, "\nRepository filter:")
+	fmt.Fprintln(w, "  --repo <repository>        Exact repository name within the organization to scan; may be repeated.")
+}
+
+func printGlobalFlags(w io.Writer) {
+	fmt.Fprintln(w, "\nFiltering and execution flags:")
+	fmt.Fprintln(w, "  --author <login>           Only include pull requests opened by this GitHub login.")
+	fmt.Fprintln(w, "  --repo-limit <n>           Process at most n repositories (0 means unlimited).")
+	fmt.Fprintln(w, "\nOutput flags:")
+	fmt.Fprintln(w, "  --json                     Emit structured JSON instead of human-readable output.")
+	fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
+	fmt.Fprintln(w, "  --no-color                 Disable ANSI color output.")
+	fmt.Fprintln(w, "  --no-progress              Suppress progress-bar output for CI or scripts.")
+	fmt.Fprintln(w, "  --version                  Print version information and exit.")
+}
+
+func printCommandFlags(w io.Writer, command Command) {
+	switch command {
+	case CommandMerge:
+		fmt.Fprintln(w, "\nMerge flags:")
+		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
+		fmt.Fprintln(w, "  --skip-rebase              Allow merge attempts when a branch is behind its default branch.")
+		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before merging candidates.")
+	case CommandRebase:
+		fmt.Fprintln(w, "\nRebase flags:")
+		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
+		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before rebasing candidates.")
+	case CommandReport:
+		fmt.Fprintln(w, "\nReport flags:")
+		fmt.Fprintln(w, "  --source-branch-prefix <prefixes>  Comma-separated head-branch prefixes to include.")
+		fmt.Fprintln(w, "  --min-group-size <n>               Include only groups with at least n pull requests (default 2).")
+		fmt.Fprintln(w, "  --verbosity <level>                 Text detail: brief, standard, or verbose.")
+	}
+}
+
+func printEnvironmentVariables(w io.Writer) {
+	fmt.Fprintln(w, "\nEnvironment variables:")
+	fmt.Fprintln(w, "  GITHUB_TOKEN               GitHub token. If unset, ghprmerge uses 'gh auth token'.")
+	fmt.Fprintln(w, "  GITHUB_ORG                 Default organization for --org.")
+	fmt.Fprintln(w, "  GHPRMERGE_AUTHOR           Default GitHub login for --author.")
+	fmt.Fprintln(w, "  GHPRMERGE_MIN_GROUP_SIZE   Default --min-group-size value for report.")
 }
 
 func formatSubcommandGuidanceError(summary string) string {

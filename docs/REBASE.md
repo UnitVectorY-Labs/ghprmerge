@@ -12,36 +12,44 @@ The `rebase` subcommand updates pull request branches that are behind the defaul
 ## Synopsis
 
 ```
-ghprmerge [global-flags] rebase [rebase-flags]
+ghprmerge rebase --org <organization> [flags]
 ```
 
 The rebase subcommand scans repositories for PRs matching the specified source branch patterns and brings out-of-date branches up-to-date with the default branch. It does **not** merge PRs — rebase and merge are separate subcommands.
 
-## Flags
-
-### Global Flags
-
-These flags are placed before the `rebase` subcommand.
+## Required Setup
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--org` | `GITHUB_ORG` env | GitHub organization to scan (required) |
-| `--repo` | - | Limit to specific repositories (repeatable) |
-| `--repo-limit` | `0` | Maximum repositories to process (0 = unlimited) |
-| `--author` | `GHPRMERGE_AUTHOR` env | Filter pull requests by author login (e.g. `app/dependabot` or a GitHub username) |
-| `--json` | `false` | Output structured JSON |
-| `--verbose` | `false` | Show all repos including those with no matching PRs |
-| `--no-color` | `false` | Disable colored output |
+| `--org <organization>` | `GITHUB_ORG` env | GitHub organization to scan. Required unless `GITHUB_ORG` is set. |
 
-### Rebase Flags
+## Filtering and Execution Controls
 
-These flags are placed after the `rebase` subcommand.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
+| `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
+| `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+
+## Output Controls
+
+All output flags can be used with `rebase`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | `false` | Output structured JSON instead of human-readable text. |
+| `--verbose` | `false` | Show repositories with no matching PRs as they are scanned. |
+| `--no-color` | `false` | Disable ANSI color output. |
+| `--no-progress` | `false` | Suppress progress-bar output for CI or scripts. |
+
+## Rebase Flags
+
+These flags are placed after `rebase`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--source-branch` | - | Branch name pattern to match PR head branches (required, repeatable) |
 | `--confirm` | `false` | Scan all repos first, then prompt for confirmation before rebasing |
-| `--repo` | - | Additional repo filter, in addition to the global `--repo` (repeatable) |
 
 ## Behavior
 
@@ -59,13 +67,13 @@ After rebasing, run the `merge` subcommand once checks have passed:
 
 ```bash
 # Step 1: Rebase out-of-date branches
-ghprmerge --org myorg rebase --source-branch dependabot/
+ghprmerge rebase --org myorg --source-branch dependabot/
 
 # Step 2: Wait for checks to pass
 sleep 300
 
 # Step 3: Merge ready PRs
-ghprmerge --org myorg merge --source-branch dependabot/
+ghprmerge merge --org myorg --source-branch dependabot/
 ```
 
 ## Dependabot Handling
@@ -77,7 +85,7 @@ The rebase subcommand uses different strategies depending on whether the branch 
 For branches with the `dependabot/` prefix, the tool posts a comment containing `@dependabot rebase` on the pull request. Dependabot detects this comment and performs the rebase on its own. This is the correct approach because Dependabot manages its own branches and direct updates via the API would conflict with its workflow.
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/
+ghprmerge rebase --org myorg --source-branch dependabot/
 ```
 
 ### Non-Dependabot branches
@@ -85,7 +93,7 @@ ghprmerge --org myorg rebase --source-branch dependabot/
 For branches that do not have the `dependabot/` prefix, the tool uses GitHub's update branch API directly to bring the branch up-to-date with the default branch.
 
 ```bash
-ghprmerge --org myorg rebase --source-branch feature/batch-update
+ghprmerge rebase --org myorg --source-branch feature/batch-update
 ```
 
 ## Confirmation Mode
@@ -96,7 +104,7 @@ The `--confirm` flag changes the execution flow to a two-phase process:
 2. **Prompt phase**: A summary of pending rebase actions is displayed, and the user is prompted for confirmation before proceeding.
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
+ghprmerge rebase --org myorg --source-branch dependabot/ --confirm
 ```
 
 On confirmation:
@@ -110,7 +118,7 @@ If no actions are pending (e.g., all PRs are already up-to-date or skipped), the
 With `--verbose`, scan-time repository results are streamed live as they are discovered, giving visibility into the scan before the prompt appears.
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/ --confirm --verbose
+ghprmerge rebase --org myorg --source-branch dependabot/ --confirm --verbose
 ```
 
 ## Multiple Source Branches
@@ -118,7 +126,7 @@ ghprmerge --org myorg rebase --source-branch dependabot/ --confirm --verbose
 The `--source-branch` flag can be specified multiple times to match PRs across different branch name patterns in a single run:
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/npm_and_yarn/ --source-branch dependabot/go_modules/
+ghprmerge rebase --org myorg --source-branch dependabot/npm_and_yarn/ --source-branch dependabot/go_modules/
 ```
 
 ### Matching behavior
@@ -133,7 +141,7 @@ The order of `--source-branch` flags matters. Place higher-priority patterns fir
 
 ```bash
 # Prioritize Go module updates over npm updates
-ghprmerge --org myorg rebase \
+ghprmerge rebase --org myorg \
   --source-branch dependabot/go_modules/ \
   --source-branch dependabot/npm_and_yarn/
 ```
@@ -147,7 +155,7 @@ In this example, if a repository has both a Go module update PR and an npm updat
 Rebase all out-of-date Dependabot PRs across the organization:
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/
+ghprmerge rebase --org myorg --source-branch dependabot/
 ```
 
 ### Rebase by author
@@ -155,7 +163,7 @@ ghprmerge --org myorg rebase --source-branch dependabot/
 Rebase only PRs opened by `app/dependabot`:
 
 ```bash
-ghprmerge --org myorg --author app/dependabot rebase --source-branch dependabot/
+ghprmerge rebase --author app/dependabot --org myorg --source-branch dependabot/
 ```
 
 ### Rebase specific repos
@@ -163,7 +171,7 @@ ghprmerge --org myorg --author app/dependabot rebase --source-branch dependabot/
 Limit rebasing to specific repositories:
 
 ```bash
-ghprmerge --org myorg --repo repo1 --repo repo2 rebase --source-branch dependabot/
+ghprmerge rebase --org myorg --repo repo1 --repo repo2 --source-branch dependabot/
 ```
 
 ### Rebase with confirmation
@@ -171,7 +179,7 @@ ghprmerge --org myorg --repo repo1 --repo repo2 rebase --source-branch dependabo
 Review planned actions before executing:
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
+ghprmerge rebase --org myorg --source-branch dependabot/ --confirm
 ```
 
 ### Rebase with verbose confirmation
@@ -179,7 +187,7 @@ ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
 Stream scan results live, then confirm before rebasing:
 
 ```bash
-ghprmerge --org myorg rebase --source-branch dependabot/ --confirm --verbose
+ghprmerge rebase --org myorg --source-branch dependabot/ --confirm --verbose
 ```
 
 ### Rebase multiple branch patterns
@@ -187,7 +195,7 @@ ghprmerge --org myorg rebase --source-branch dependabot/ --confirm --verbose
 Rebase PRs from multiple Dependabot ecosystems:
 
 ```bash
-ghprmerge --org myorg rebase \
+ghprmerge rebase --org myorg \
   --source-branch dependabot/npm_and_yarn/ \
   --source-branch dependabot/go_modules/ \
   --source-branch dependabot/pip/
@@ -198,7 +206,7 @@ ghprmerge --org myorg rebase \
 Process at most 10 repositories:
 
 ```bash
-ghprmerge --org myorg --repo-limit 10 rebase --source-branch dependabot/
+ghprmerge rebase --repo-limit 10 --org myorg --source-branch dependabot/
 ```
 
 ### Rebase non-Dependabot branches
@@ -206,7 +214,7 @@ ghprmerge --org myorg --repo-limit 10 rebase --source-branch dependabot/
 Update a custom branch pattern using the GitHub update branch API directly:
 
 ```bash
-ghprmerge --org myorg rebase --source-branch feature/batch-update
+ghprmerge rebase --org myorg --source-branch feature/batch-update
 ```
 
 ### JSON output for scripting
@@ -214,7 +222,7 @@ ghprmerge --org myorg rebase --source-branch feature/batch-update
 Get structured output for automation pipelines:
 
 ```bash
-ghprmerge --org myorg --json rebase --source-branch dependabot/ | jq '.summary'
+ghprmerge rebase --json --org myorg --source-branch dependabot/ | jq '.summary'
 ```
 
 ### Disable colored output
@@ -222,7 +230,7 @@ ghprmerge --org myorg --json rebase --source-branch dependabot/ | jq '.summary'
 Useful for CI environments or piping to a file:
 
 ```bash
-ghprmerge --org myorg --no-color rebase --source-branch dependabot/
+ghprmerge rebase --no-color --org myorg --source-branch dependabot/
 ```
 
 ### Production workflow
@@ -231,11 +239,11 @@ A typical two-step workflow using rebase and merge as separate operations:
 
 ```bash
 # Step 1: Rebase out-of-date branches
-ghprmerge --org myorg rebase --source-branch dependabot/ --confirm
+ghprmerge rebase --org myorg --source-branch dependabot/ --confirm
 
 # Step 2: Wait for checks to pass
 sleep 300
 
 # Step 3: Merge ready PRs
-ghprmerge --org myorg merge --source-branch dependabot/
+ghprmerge merge --org myorg --source-branch dependabot/
 ```
