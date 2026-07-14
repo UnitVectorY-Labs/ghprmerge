@@ -209,10 +209,10 @@ ghprmerge report --org myorg
 
 ### Filter by author
 
-Show only PRs opened by `app/dependabot`:
+Show only PRs opened by `dependabot[bot]`:
 
 ```bash
-ghprmerge report --author app/dependabot --org myorg
+ghprmerge report --author 'dependabot[bot]' --org myorg
 ```
 
 Show only PRs opened by a specific user:

@@ -249,7 +249,7 @@ Filter pull requests to only those opened by a specific author. This works with 
 Merge only PRs opened by the Dependabot app:
 
 ```bash
-ghprmerge merge --author app/dependabot --org myorg --source-branch dependabot/
+ghprmerge merge --author 'dependabot[bot]' --org myorg --source-branch dependabot/
 ```
 
 Rebase only PRs opened by a specific user:
@@ -261,13 +261,13 @@ ghprmerge rebase --author JaredHatfield --org myorg --source-branch feature/
 Report on PRs from a specific author:
 
 ```bash
-ghprmerge report --author app/dependabot --org myorg
+ghprmerge report --author 'dependabot[bot]' --org myorg
 ```
 
 The `--author` flag can also be set via the `GHPRMERGE_AUTHOR` environment variable:
 
 ```bash
-export GHPRMERGE_AUTHOR=app/dependabot
+export GHPRMERGE_AUTHOR='dependabot[bot]'
 ghprmerge merge --org myorg --source-branch dependabot/
 ```
 

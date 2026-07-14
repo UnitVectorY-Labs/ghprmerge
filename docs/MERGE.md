@@ -146,10 +146,10 @@ ghprmerge merge --org myorg --source-branch dependabot/
 
 ### Merge by author
 
-Merge only PRs opened by `app/dependabot`:
+Merge only PRs opened by `dependabot[bot]`:
 
 ```bash
-ghprmerge merge --author app/dependabot --org myorg --source-branch dependabot/
+ghprmerge merge --author 'dependabot[bot]' --org myorg --source-branch dependabot/
 ```
 
 Merge only PRs opened by a specific user:

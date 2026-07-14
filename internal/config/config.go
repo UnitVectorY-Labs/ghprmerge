@@ -247,7 +247,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		subFS.BoolVar(&jsonOutput, "json", jsonOutput, "Output structured JSON instead of human-readable text")
 		subFS.BoolVar(&noColor, "no-color", noColor, "Disable colored output")
 		subFS.BoolVar(&noProgress, "no-progress", noProgress, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
-		subFS.StringVar(&author, "author", author, "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
+		subFS.StringVar(&author, "author", author, "Filter pull requests by author login (e.g. dependabot[bot] or a GitHub username)")
 
 		switch command {
 		case CommandMerge:
