@@ -33,12 +33,11 @@ The report subcommand discovers repositories using the same logic as the `merge`
 
 ## Output Controls
 
-All output flags can be used with `report`.
+All output flags except `--verbose` can be used with `report`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--json` | `false` | Output structured JSON instead of human-readable text. |
-| `--verbose` | `false` | Show repositories with no matching PRs as they are scanned. |
 | `--no-color` | `false` | Disable ANSI color output. |
 | `--no-progress` | `false` | Suppress progress-bar output for CI or scripts. |
 
@@ -52,7 +51,7 @@ These flags are placed after `report`.
 | `--min-group-size` | `2` (`GHPRMERGE_MIN_GROUP_SIZE` env) | Minimum number of PRs in a group to include in report |
 | `--verbosity` | `standard` | Report output verbosity: `brief`, `standard`, or `verbose` |
 
-**Flag restrictions**: The flags `--source-branch`, `--skip-rebase`, and `--confirm` cannot be used with the `report` subcommand. These flags are specific to `merge` and `rebase`.
+**Flag restrictions**: The flags `--source-branch`, `--skip-rebase`, `--confirm`, and `--verbose` cannot be used with the `report` subcommand.
 
 ## Behavior
 

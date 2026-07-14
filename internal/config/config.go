@@ -245,17 +245,18 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		subFS.Var(&repos, "repo", "Exact repository name in the organization to scan (may be repeated)")
 		subFS.IntVar(&repoLimit, "repo-limit", repoLimit, "Maximum number of repositories to process (0 = unlimited)")
 		subFS.BoolVar(&jsonOutput, "json", jsonOutput, "Output structured JSON instead of human-readable text")
-		subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 		subFS.BoolVar(&noColor, "no-color", noColor, "Disable colored output")
 		subFS.BoolVar(&noProgress, "no-progress", noProgress, "Suppress progress bar output (useful for scripting, CI, and non-TTY environments)")
 		subFS.StringVar(&author, "author", author, "Filter pull requests by author login (e.g. app/dependabot or a GitHub username)")
 
 		switch command {
 		case CommandMerge:
+			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
 			subFS.BoolVar(&skipRebase, "skip-rebase", false, "Skip rebase check and merge PRs that are behind")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
 		case CommandRebase:
+			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
 		case CommandReport:
@@ -404,7 +405,6 @@ func printGlobalFlags(w io.Writer) {
 	fmt.Fprintln(w, "  --repo-limit <n>           Process at most n repositories (0 means unlimited).")
 	fmt.Fprintln(w, "\nOutput flags:")
 	fmt.Fprintln(w, "  --json                     Emit structured JSON instead of human-readable output.")
-	fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
 	fmt.Fprintln(w, "  --no-color                 Disable ANSI color output.")
 	fmt.Fprintln(w, "  --no-progress              Suppress progress-bar output for CI or scripts.")
 	fmt.Fprintln(w, "  --version                  Print version information and exit.")
@@ -417,10 +417,12 @@ func printCommandFlags(w io.Writer, command Command) {
 		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
 		fmt.Fprintln(w, "  --skip-rebase              Allow merge attempts when a branch is behind its default branch.")
 		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before merging candidates.")
+		fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
 	case CommandRebase:
 		fmt.Fprintln(w, "\nRebase flags:")
 		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
 		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before rebasing candidates.")
+		fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
 	case CommandReport:
 		fmt.Fprintln(w, "\nReport flags:")
 		fmt.Fprintln(w, "  --source-branch-prefix <prefixes>  Comma-separated head-branch prefixes to include.")
