@@ -36,7 +36,7 @@ ghprmerge merge --org myorg --source-branch dependabot/ --skip-rebase
 ghprmerge merge --org myorg --source-branch dependabot/ --source-branch feature/
 
 # Filter by author (e.g. only Dependabot PRs opened by the app)
-ghprmerge merge --author app/dependabot --org myorg --source-branch dependabot/
+ghprmerge merge --author 'dependabot[bot]' --org myorg --source-branch dependabot/
 
 # Use --confirm to review pending actions before taking action
 ghprmerge rebase --org myorg --source-branch dependabot/ --confirm

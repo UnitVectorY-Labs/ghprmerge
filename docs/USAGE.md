@@ -30,7 +30,7 @@ Use these to narrow the repositories or pull requests that a command considers.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the selected organization. Repeat for multiple repositories, such as `--repo api --repo web`. |
-| `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login, such as `app/dependabot`. |
+| `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login, such as `dependabot[bot]`. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
 
 ## Output Controls

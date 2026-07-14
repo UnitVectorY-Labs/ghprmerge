@@ -160,10 +160,10 @@ ghprmerge rebase --org myorg --source-branch dependabot/
 
 ### Rebase by author
 
-Rebase only PRs opened by `app/dependabot`:
+Rebase only PRs opened by `dependabot[bot]`:
 
 ```bash
-ghprmerge rebase --author app/dependabot --org myorg --source-branch dependabot/
+ghprmerge rebase --author 'dependabot[bot]' --org myorg --source-branch dependabot/
 ```
 
 ### Rebase specific repos
