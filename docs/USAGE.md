@@ -40,7 +40,6 @@ These flags can be used with every subcommand.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--json` | `false` | Output structured JSON |
-| `--verbose` | `false` | Stream repository results during scanning, including repos with no matching pull requests |
 | `--no-color` | `false` | Disable colored output |
 | `--no-progress` | `false` | Suppress progress bar output (useful for scripting, CI, and non-TTY environments) |
 | `--version` | - | Show version information and exit |
@@ -64,6 +63,7 @@ Scans matching PRs and merges only those that are ready: not drafts, targeting t
 | `--source-branch <pattern>` | Required. Head-branch prefix to match; may be repeated. |
 | `--skip-rebase` | Allow merge attempts when a branch is behind its default branch. |
 | `--confirm` | Scan first, then prompt before merging candidates. |
+| `--verbose` | Stream repository results during scanning, including repos with no matching pull requests. |
 
 ### `rebase`
 
@@ -73,6 +73,7 @@ Scans matching PRs and updates branches that are behind their repositories' defa
 |------|-------------|
 | `--source-branch <pattern>` | Required. Head-branch prefix to match; may be repeated. |
 | `--confirm` | Scan first, then prompt before rebasing candidates. |
+| `--verbose` | Stream repository results during scanning, including repos with no matching pull requests. |
 
 ### `report`
 
@@ -136,7 +137,7 @@ Repositories are processed **one at a time**. The tool:
 - Never operates on multiple repos in parallel
 - Shows a progress bar as repositories are scanned
 - When an action is performed (merge or rebase), the result is streamed to the console immediately, with the progress bar continuing below
-- With `--verbose`, streams every repository result as soon as it is known
+- With `--verbose` (merge/rebase only), streams every repository result as soon as it is known
 - With `--confirm`, streams action results during the execution phase after the user confirms
 
 ## Archived Repository Handling
@@ -185,7 +186,7 @@ Each action result is streamed to the console as soon as it completes, with the 
   Scanning  15/25 [█████████████████████████████████                      ]  60%
 ```
 
-With `--verbose`, repository results are emitted live during scanning, including repositories with no matching pull requests:
+With `--verbose` (merge and rebase only), repository results are emitted live during scanning, including repositories with no matching pull requests:
 ```
   ─ myorg/repo2 ─ no matching pull requests
   ✓ myorg/repo1 #42 Bump lodash to 4.17.21
