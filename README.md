@@ -32,6 +32,9 @@ ghprmerge merge --org myorg --source-branch dependabot/
 # Merge PRs even if behind (skip rebase requirement)
 ghprmerge merge --org myorg --source-branch dependabot/ --skip-rebase
 
+# Wait at least 30 seconds between merge requests (or set GHPRMERGE_MIN_MERGE_DELAY=30)
+ghprmerge merge --org myorg --source-branch dependabot/ --min-merge-delay 30
+
 # Match multiple source branches
 ghprmerge merge --org myorg --source-branch dependabot/ --source-branch feature/
 

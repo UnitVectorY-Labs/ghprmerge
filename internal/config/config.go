@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -75,6 +76,7 @@ type Config struct {
 	Report             bool
 	SourceBranchPrefix []string
 	MinGroupSize       int
+	MinMergeDelay      int
 	Verbosity          string
 	Command            Command
 	Author             string
@@ -92,6 +94,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Token == "" {
 		return fmt.Errorf("no GitHub token found: set GITHUB_TOKEN environment variable or authenticate with 'gh auth login'")
+	}
+	if c.MinMergeDelay < 0 {
+		return fmt.Errorf("--min-merge-delay must be 0 or greater")
 	}
 
 	// Report mode validation
@@ -233,6 +238,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	var confirm bool
 	var sourceBranchPrefixStr string
 	var minGroupSize int
+	var minMergeDelay int
 	var verbosity string
 	var repos StringSliceFlag
 
@@ -251,10 +257,15 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 		switch command {
 		case CommandMerge:
+			defaultMinMergeDelay, err := envNonNegativeInt("GHPRMERGE_MIN_MERGE_DELAY")
+			if err != nil {
+				return nil, err
+			}
 			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
 			subFS.BoolVar(&skipRebase, "skip-rebase", false, "Skip rebase check and merge PRs that are behind")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
+			subFS.IntVar(&minMergeDelay, "min-merge-delay", defaultMinMergeDelay, "Minimum seconds between merge requests (0 = no delay)")
 		case CommandRebase:
 			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
@@ -332,10 +343,24 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		Report:             command == CommandReport,
 		SourceBranchPrefix: prefixes,
 		MinGroupSize:       minGroupSize,
+		MinMergeDelay:      minMergeDelay,
 		Verbosity:          verbosity,
 		Command:            command,
 		Author:             author,
 	}, nil
+}
+
+func envNonNegativeInt(name string) (int, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return 0, nil
+	}
+
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("invalid %s value %q: must be a non-negative integer", name, value)
+	}
+	return n, nil
 }
 
 func commandName() string {
@@ -416,6 +441,7 @@ func printCommandFlags(w io.Writer, command Command) {
 		fmt.Fprintln(w, "\nMerge flags:")
 		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
 		fmt.Fprintln(w, "  --skip-rebase              Allow merge attempts when a branch is behind its default branch.")
+		fmt.Fprintln(w, "  --min-merge-delay <secs>  Minimum seconds between merge requests (0 means no delay).")
 		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before merging candidates.")
 		fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
 	case CommandRebase:
@@ -437,6 +463,7 @@ func printEnvironmentVariables(w io.Writer) {
 	fmt.Fprintln(w, "  GITHUB_ORG                 Default organization for --org.")
 	fmt.Fprintln(w, "  GHPRMERGE_AUTHOR           Default GitHub login for --author.")
 	fmt.Fprintln(w, "  GHPRMERGE_MIN_GROUP_SIZE   Default --min-group-size value for report.")
+	fmt.Fprintln(w, "  GHPRMERGE_MIN_MERGE_DELAY  Default --min-merge-delay value for merge (seconds).")
 }
 
 func formatSubcommandGuidanceError(summary string) string {

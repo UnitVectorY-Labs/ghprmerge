@@ -64,6 +64,20 @@ This is useful when your repository is configured to not require branches to be 
 
 **Note**: `--skip-rebase` is only available under the `merge` subcommand. PRs with merge conflicts or failing checks will still be skipped.
 
+## Rate-Limited Merges
+
+Wait at least 30 seconds between merge requests. The delay is applied only immediately before each merge request, rather than as a scanning delay:
+
+```bash
+ghprmerge merge --org myorg --source-branch dependabot/ --min-merge-delay 30
+```
+
+Set the same default through the environment (the flag takes precedence):
+
+```bash
+GHPRMERGE_MIN_MERGE_DELAY=30 ghprmerge merge --org myorg --source-branch dependabot/
+```
+
 ## Confirmation Mode
 
 Scan all repositories first, then prompt before taking actions:
