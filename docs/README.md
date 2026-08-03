@@ -56,10 +56,10 @@ For each repository (processed sequentially):
 2. Enumerate candidate PRs matching `--source-branch` patterns (can be specified multiple times)
 3. For each candidate PR:
    - Evaluate readiness (checks, conflicts, branch status)
-   - If PR is valid: attempt merge
+   - If PR is valid: attempt merge, waiting as needed to satisfy `--min-merge-delay` between merge requests
    - With `--skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
-4. Show progress bar during scanning
+4. Show progress bar during scanning. The merge delay is applied only immediately before a merge request; it is not a scanning delay.
    - Stream each action result to the console immediately with the progress bar continuing below
    - With `--verbose`, stream each repository result as soon as it is known
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution

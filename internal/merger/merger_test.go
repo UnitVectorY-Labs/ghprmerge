@@ -6,11 +6,29 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/github"
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/output"
 )
+
+func TestMergeDelayHonorsContextCancellation(t *testing.T) {
+	mock := github.NewMockClient()
+	cfg := &config.Config{MinMergeDelay: 1}
+	m := New(mock, cfg, nil)
+	m.lastMergeAttempt = time.Now()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := m.mergePullRequest(ctx, "testorg", "repo", 1)
+	if err == nil || !strings.Contains(err.Error(), "merge delay interrupted") {
+		t.Fatalf("mergePullRequest() error = %v, want merge delay interruption", err)
+	}
+	if len(mock.MergeCalls) != 0 {
+		t.Errorf("MergePullRequest called %d times, want 0", len(mock.MergeCalls))
+	}
+}
 
 func TestMergerAnalysisOnly(t *testing.T) {
 	mock := github.NewMockClient()

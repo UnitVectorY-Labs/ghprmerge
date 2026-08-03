@@ -25,6 +25,7 @@ func TestRootHelpDocumentsCommandsFlagsAndEnvironment(t *testing.T) {
 		"Environment variables:",
 		"GITHUB_TOKEN",
 		"GITHUB_ORG",
+		"GHPRMERGE_MIN_MERGE_DELAY",
 	} {
 		if !contains(output.String(), expected) {
 			t.Errorf("root help does not contain %q:\n%s", expected, output.String())
@@ -43,6 +44,7 @@ func TestSubcommandHelpDocumentsBehaviorGlobalAndCommandFlags(t *testing.T) {
 				"merges only those that are ready",
 				"--source-branch <pattern>",
 				"--skip-rebase",
+				"--min-merge-delay <secs>",
 			},
 		},
 		{
@@ -80,6 +82,39 @@ func TestSubcommandHelpDocumentsBehaviorGlobalAndCommandFlags(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseFlagsMinMergeDelay(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("GITHUB_ORG", "myorg")
+	t.Setenv("GHPRMERGE_MIN_MERGE_DELAY", "15")
+
+	cfg, err := ParseFlags([]string{"merge", "--source-branch", "dependabot/"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if cfg.MinMergeDelay != 15 {
+		t.Errorf("MinMergeDelay = %d, want 15", cfg.MinMergeDelay)
+	}
+
+	cfg, err = ParseFlags([]string{"merge", "--source-branch", "dependabot/", "--min-merge-delay", "3"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if cfg.MinMergeDelay != 3 {
+		t.Errorf("MinMergeDelay = %d, want 3", cfg.MinMergeDelay)
+	}
+}
+
+func TestParseFlagsRejectsInvalidMinMergeDelayEnvironment(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("GITHUB_ORG", "myorg")
+	t.Setenv("GHPRMERGE_MIN_MERGE_DELAY", "-1")
+
+	_, err := ParseFlags([]string{"merge", "--source-branch", "dependabot/"}, "test")
+	if err == nil || !contains(err.Error(), "GHPRMERGE_MIN_MERGE_DELAY") {
+		t.Fatalf("ParseFlags() error = %v, want invalid GHPRMERGE_MIN_MERGE_DELAY error", err)
 	}
 }
 

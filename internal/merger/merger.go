@@ -19,6 +19,7 @@ type Merger struct {
 	config           *config.Config
 	console          *output.Console
 	scanDisplayLines int
+	lastMergeAttempt time.Time
 }
 
 // New creates a new Merger with the given client and configuration.
@@ -270,13 +271,32 @@ func (m *Merger) executeRebase(ctx context.Context, owner, repoName string, pr *
 
 // executeMerge executes a merge action on a PR.
 func (m *Merger) executeMerge(ctx context.Context, owner, repoName string, pr *output.PullRequestResult) {
-	if err := m.client.MergePullRequest(ctx, owner, repoName, pr.Number); err != nil {
+	if err := m.mergePullRequest(ctx, owner, repoName, pr.Number); err != nil {
 		pr.Action = output.ActionMergeFailed
 		pr.Reason = fmt.Sprintf("merge failed: %v", err)
 	} else {
 		pr.Action = output.ActionMerged
 		pr.Reason = "successfully merged"
 	}
+}
+
+// mergePullRequest waits only immediately before a merge request, so PR discovery
+// and readiness checks are never deliberately delayed by MinMergeDelay.
+func (m *Merger) mergePullRequest(ctx context.Context, owner, repoName string, number int) error {
+	if delay := time.Duration(m.config.MinMergeDelay) * time.Second; delay > 0 && !m.lastMergeAttempt.IsZero() {
+		if remaining := time.Until(m.lastMergeAttempt.Add(delay)); remaining > 0 {
+			timer := time.NewTimer(remaining)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("merge delay interrupted: %w", ctx.Err())
+			case <-timer.C:
+			}
+		}
+	}
+
+	m.lastMergeAttempt = time.Now()
+	return m.client.MergePullRequest(ctx, owner, repoName, number)
 }
 
 // processRepositoryScanOnly processes a repository without taking actions (for --confirm mode).
@@ -668,7 +688,7 @@ func (m *Merger) handleOutdatedBranch(ctx context.Context, owner string, repo gh
 	// If skip-rebase is enabled with merge, proceed to merge despite being behind
 	if m.config.SkipRebase && m.config.Merge {
 		// Perform merge (branch is behind but we're skipping the rebase requirement)
-		if err := m.client.MergePullRequest(ctx, owner, repo.Name, pr.Number); err != nil {
+		if err := m.mergePullRequest(ctx, owner, repo.Name, pr.Number); err != nil {
 			result.Action = output.ActionMergeFailed
 			result.Reason = fmt.Sprintf("merge failed: %v", err)
 			return result
@@ -725,7 +745,7 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 	}
 
 	// Perform merge
-	if err := m.client.MergePullRequest(ctx, owner, repo.Name, pr.Number); err != nil {
+	if err := m.mergePullRequest(ctx, owner, repo.Name, pr.Number); err != nil {
 		result.Action = output.ActionMergeFailed
 		result.Reason = fmt.Sprintf("merge failed: %v", err)
 		return result

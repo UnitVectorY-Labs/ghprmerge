@@ -62,6 +62,7 @@ Scans matching PRs and merges only those that are ready: not drafts, targeting t
 |------|-------------|
 | `--source-branch <pattern>` | Required. Head-branch prefix to match; may be repeated. |
 | `--skip-rebase` | Allow merge attempts when a branch is behind its default branch. |
+| `--min-merge-delay <secs>` | Minimum seconds between merge requests; `0` (the default) adds no delay. The delay is applied immediately before a merge request, not while scanning or evaluating PRs. |
 | `--confirm` | Scan first, then prompt before merging candidates. |
 | `--verbose` | Stream repository results during scanning, including repos with no matching pull requests. |
 
@@ -111,6 +112,7 @@ If you omit a subcommand and required command-specific flags, the error message 
 | `GITHUB_ORG` | Default organization (can be overridden by `--org`) |
 | `GHPRMERGE_AUTHOR` | Default author filter (can be overridden by `--author`) |
 | `GHPRMERGE_MIN_GROUP_SIZE` | Default minimum group size for the `report` command (can be overridden by `--min-group-size`) |
+| `GHPRMERGE_MIN_MERGE_DELAY` | Default minimum delay in seconds between merge requests for `merge` (can be overridden by `--min-merge-delay`) |
 
 ## Authentication
 
