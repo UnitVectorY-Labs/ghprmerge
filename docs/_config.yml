@@ -1,5 +1,5 @@
 title: ghprmerge
-description: "A command-line tool to automatically evaluate, merge, and optionally rebase GitHub pull requests sharing the same source branch across an organization."
+description: "A command-line tool to evaluate, merge, rebase, or close GitHub pull requests sharing the same source branch across an organization."
 
 remote_theme: just-the-docs/just-the-docs@v0.12.0
 plugins:

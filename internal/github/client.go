@@ -22,18 +22,19 @@ type Repository struct {
 
 // PullRequest represents a GitHub pull request.
 type PullRequest struct {
-	Number       int
-	Title        string
-	URL          string
-	HeadBranch   string
-	BaseBranch   string
-	State        string
-	Draft        bool
-	Mergeable    *bool
-	HeadSHA      string
-	RepoName     string
-	RepoFullName string
-	Author       string
+	Number           int
+	Title            string
+	URL              string
+	HeadBranch       string
+	BaseBranch       string
+	State            string
+	Draft            bool
+	Mergeable        *bool
+	HeadSHA          string
+	RepoName         string
+	RepoFullName     string
+	HeadRepoFullName string
+	Author           string
 }
 
 // CheckStatus represents the overall status of checks on a commit.
@@ -83,6 +84,12 @@ type Client interface {
 
 	// MergePullRequest merges a pull request.
 	MergePullRequest(ctx context.Context, owner, repo string, prNumber int) error
+
+	// ClosePullRequest closes a pull request without merging it.
+	ClosePullRequest(ctx context.Context, owner, repo string, prNumber int) error
+
+	// DeleteBranch deletes a branch from a repository.
+	DeleteBranch(ctx context.Context, owner, repo, branch string) error
 }
 
 // RealClient implements the Client interface using the real GitHub API.
@@ -155,18 +162,19 @@ func (c *RealClient) ListPullRequests(ctx context.Context, owner, repo, defaultB
 
 		for _, pr := range prs {
 			allPRs = append(allPRs, PullRequest{
-				Number:       pr.GetNumber(),
-				Title:        pr.GetTitle(),
-				URL:          pr.GetHTMLURL(),
-				HeadBranch:   pr.GetHead().GetRef(),
-				BaseBranch:   pr.GetBase().GetRef(),
-				State:        pr.GetState(),
-				Draft:        pr.GetDraft(),
-				Mergeable:    pr.Mergeable,
-				HeadSHA:      pr.GetHead().GetSHA(),
-				RepoName:     repo,
-				RepoFullName: fmt.Sprintf("%s/%s", owner, repo),
-				Author:       pr.GetUser().GetLogin(),
+				Number:           pr.GetNumber(),
+				Title:            pr.GetTitle(),
+				URL:              pr.GetHTMLURL(),
+				HeadBranch:       pr.GetHead().GetRef(),
+				BaseBranch:       pr.GetBase().GetRef(),
+				State:            pr.GetState(),
+				Draft:            pr.GetDraft(),
+				Mergeable:        pr.Mergeable,
+				HeadSHA:          pr.GetHead().GetSHA(),
+				RepoName:         repo,
+				RepoFullName:     fmt.Sprintf("%s/%s", owner, repo),
+				HeadRepoFullName: pr.GetHead().GetRepo().GetFullName(),
+				Author:           pr.GetUser().GetLogin(),
 			})
 		}
 
@@ -187,18 +195,19 @@ func (c *RealClient) GetPullRequest(ctx context.Context, owner, repo string, num
 	}
 
 	return &PullRequest{
-		Number:       pr.GetNumber(),
-		Title:        pr.GetTitle(),
-		URL:          pr.GetHTMLURL(),
-		HeadBranch:   pr.GetHead().GetRef(),
-		BaseBranch:   pr.GetBase().GetRef(),
-		State:        pr.GetState(),
-		Draft:        pr.GetDraft(),
-		Mergeable:    pr.Mergeable,
-		HeadSHA:      pr.GetHead().GetSHA(),
-		RepoName:     repo,
-		RepoFullName: fmt.Sprintf("%s/%s", owner, repo),
-		Author:       pr.GetUser().GetLogin(),
+		Number:           pr.GetNumber(),
+		Title:            pr.GetTitle(),
+		URL:              pr.GetHTMLURL(),
+		HeadBranch:       pr.GetHead().GetRef(),
+		BaseBranch:       pr.GetBase().GetRef(),
+		State:            pr.GetState(),
+		Draft:            pr.GetDraft(),
+		Mergeable:        pr.Mergeable,
+		HeadSHA:          pr.GetHead().GetSHA(),
+		RepoName:         repo,
+		RepoFullName:     fmt.Sprintf("%s/%s", owner, repo),
+		HeadRepoFullName: pr.GetHead().GetRepo().GetFullName(),
+		Author:           pr.GetUser().GetLogin(),
 	}, nil
 }
 
@@ -359,6 +368,25 @@ func (c *RealClient) MergePullRequest(ctx context.Context, owner, repo string, p
 	_, _, err := c.client.PullRequests.Merge(ctx, owner, repo, prNumber, "", &github.PullRequestOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to merge pull request: %w", err)
+	}
+	return nil
+}
+
+// ClosePullRequest closes a pull request without merging it.
+func (c *RealClient) ClosePullRequest(ctx context.Context, owner, repo string, prNumber int) error {
+	state := "closed"
+	_, _, err := c.client.PullRequests.Edit(ctx, owner, repo, prNumber, &github.PullRequest{State: &state})
+	if err != nil {
+		return fmt.Errorf("failed to close pull request: %w", err)
+	}
+	return nil
+}
+
+// DeleteBranch deletes a branch from a repository.
+func (c *RealClient) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	_, err := c.client.Git.DeleteRef(ctx, owner, repo, "heads/"+branch)
+	if err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 	return nil
 }

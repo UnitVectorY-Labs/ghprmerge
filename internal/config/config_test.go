@@ -118,6 +118,28 @@ func TestParseFlagsRejectsInvalidMinMergeDelayEnvironment(t *testing.T) {
 	}
 }
 
+func TestParseFlagsCloseCommand(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("GITHUB_ORG", "myorg")
+
+	cfg, err := ParseFlags([]string{"close", "--source-branch", "dependabot/", "--author", "dependabot[bot]", "--delete-source-branch"}, "test")
+	if err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+	if cfg.Command != CommandClose || !cfg.Close {
+		t.Errorf("close command = (%q, %v), want (%q, true)", cfg.Command, cfg.Close, CommandClose)
+	}
+	if !cfg.DeleteSourceBranch {
+		t.Error("DeleteSourceBranch = false, want true")
+	}
+	if cfg.Author != "dependabot[bot]" {
+		t.Errorf("Author = %q, want dependabot[bot]", cfg.Author)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("close config Validate() error = %v", err)
+	}
+}
+
 func TestParseFlags(t *testing.T) {
 	origToken := os.Getenv("GITHUB_TOKEN")
 	origOrg := os.Getenv("GITHUB_ORG")

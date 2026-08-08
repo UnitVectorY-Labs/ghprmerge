@@ -73,7 +73,7 @@ func run() error {
 		return runReport(ctx, m, cfg)
 	}
 
-	// Normal mode (merge, rebase, or analysis): act on source branches
+	// Normal mode (merge, rebase, close, or analysis): act on source branches
 	return runNormal(ctx, m, cfg, console)
 }
 
@@ -137,7 +137,7 @@ func runNormal(ctx context.Context, m *merger.Merger, cfg *config.Config, consol
 
 // hasActionsToPerform checks if the result contains actions that would be performed.
 func hasActionsToPerform(result *output.RunResult) bool {
-	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
+	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0 || result.Summary.WouldClose > 0
 }
 
 // promptConfirmation displays pending actions and prompts for confirmation.
@@ -150,7 +150,7 @@ func promptConfirmation(console *output.Console, result *output.RunResult, showP
 		lines++
 		for _, repo := range result.Repositories {
 			for _, pr := range repo.PullRequests {
-				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
+				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase || pr.Action == output.ActionWouldClose {
 					lines += console.PrintPendingAction(repo, pr)
 				}
 			}
@@ -160,7 +160,7 @@ func promptConfirmation(console *output.Console, result *output.RunResult, showP
 		lines++
 		for _, repo := range result.Repositories {
 			for _, pr := range repo.PullRequests {
-				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase {
+				if pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldRebase || pr.Action == output.ActionWouldClose {
 					fmt.Fprintf(os.Stderr, "  %s #%d %s ─ %s\n", repo.FullName, pr.Number, pr.Title, pr.Action)
 					lines++
 				}

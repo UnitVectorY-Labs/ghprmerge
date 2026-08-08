@@ -56,6 +56,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 			Mode:          mode,
 			Rebase:        m.config.Rebase,
 			Merge:         m.config.Merge,
+			Close:         m.config.Close,
 			RepoLimit:     m.config.RepoLimit,
 			RepoLimitDesc: repoLimitDesc,
 			StartTime:     startTime,
@@ -169,8 +170,11 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	scanResult.Summary.MergeFailed = 0
 	scanResult.Summary.RebasedSuccess = 0
 	scanResult.Summary.RebaseFailed = 0
+	scanResult.Summary.ClosedSuccess = 0
+	scanResult.Summary.CloseFailed = 0
 	scanResult.Summary.WouldMerge = 0
 	scanResult.Summary.WouldRebase = 0
+	scanResult.Summary.WouldClose = 0
 	scanResult.Summary.Skipped = 0
 	scanResult.Summary.SkippedByReason = make(map[string]int)
 
@@ -178,7 +182,7 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	totalActions := 0
 	for _, repo := range scanResult.Repositories {
 		for _, pr := range repo.PullRequests {
-			if pr.Action == output.ActionWouldRebase || pr.Action == output.ActionWouldMerge {
+			if pr.Action == output.ActionWouldRebase || pr.Action == output.ActionWouldMerge || pr.Action == output.ActionWouldClose {
 				totalActions++
 			}
 		}
@@ -213,6 +217,12 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 					m.console.ProgressBar(actionNum, totalActions, "Executing")
 				}
 				m.executeMerge(ctx, owner, repo.Name, pr)
+			case output.ActionWouldClose:
+				actionNum++
+				if showProgress {
+					m.console.ProgressBar(actionNum, totalActions, "Executing")
+				}
+				m.executeClose(ctx, owner, repo.Name, pr)
 			}
 
 			// Update summary
@@ -280,6 +290,35 @@ func (m *Merger) executeMerge(ctx context.Context, owner, repoName string, pr *o
 	}
 }
 
+// executeClose closes a PR and optionally deletes its source branch.
+func (m *Merger) executeClose(ctx context.Context, owner, repoName string, pr *output.PullRequestResult) {
+	if err := m.client.ClosePullRequest(ctx, owner, repoName, pr.Number); err != nil {
+		pr.Action = output.ActionCloseFailed
+		pr.Reason = fmt.Sprintf("close failed: %v", err)
+		return
+	}
+
+	pr.Action = output.ActionClosed
+	pr.Reason = "successfully closed"
+	if !m.config.DeleteSourceBranch {
+		return
+	}
+
+	parts := strings.SplitN(pr.HeadRepoFullName, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		pr.Action = output.ActionCloseFailed
+		pr.Reason = fmt.Sprintf("closed, but could not determine source repository %q for branch deletion", pr.HeadRepoFullName)
+		return
+	}
+	branchOwner, branchRepo := parts[0], parts[1]
+	if err := m.client.DeleteBranch(ctx, branchOwner, branchRepo, pr.HeadBranch); err != nil {
+		pr.Action = output.ActionCloseFailed
+		pr.Reason = fmt.Sprintf("closed, but source branch deletion failed: %v", err)
+		return
+	}
+	pr.Reason = "successfully closed and source branch deleted"
+}
+
 // mergePullRequest waits only immediately before a merge request, so PR discovery
 // and readiness checks are never deliberately delayed by MinMergeDelay.
 func (m *Merger) mergePullRequest(ctx context.Context, owner, repoName string, number int) error {
@@ -330,10 +369,20 @@ func (m *Merger) processRepositoryScanOnly(ctx context.Context, repo gh.Reposito
 // evaluatePullRequest evaluates a PR and returns what action would be taken (no side effects).
 func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest) output.PullRequestResult {
 	result := output.PullRequestResult{
-		Number:     pr.Number,
-		URL:        pr.URL,
-		HeadBranch: pr.HeadBranch,
-		Title:      pr.Title,
+		Number:           pr.Number,
+		URL:              pr.URL,
+		HeadBranch:       pr.HeadBranch,
+		Title:            pr.Title,
+		HeadRepoFullName: pr.HeadRepoFullName,
+	}
+
+	if m.config.Close {
+		result.Action = output.ActionWouldClose
+		result.Reason = "would close"
+		if m.config.DeleteSourceBranch {
+			result.Reason += " and delete source branch"
+		}
+		return result
 	}
 
 	// Get check status
@@ -434,6 +483,9 @@ func (m *Merger) getModeDescription() string {
 	if m.config.Merge {
 		return "merge mode"
 	}
+	if m.config.Close {
+		return "close mode"
+	}
 	return "analysis only (no mutations)"
 }
 
@@ -457,7 +509,7 @@ func (m *Merger) printRepoResultWithProgress(repo output.RepositoryResult, curre
 func hasCompletedActions(repo output.RepositoryResult) bool {
 	for _, pr := range repo.PullRequests {
 		switch pr.Action {
-		case output.ActionMerged, output.ActionMergeFailed, output.ActionRebased, output.ActionRebaseFailed:
+		case output.ActionMerged, output.ActionMergeFailed, output.ActionRebased, output.ActionRebaseFailed, output.ActionClosed, output.ActionCloseFailed:
 			return true
 		}
 	}
@@ -465,7 +517,7 @@ func hasCompletedActions(repo output.RepositoryResult) bool {
 }
 
 func hasPendingActions(result *output.RunResult) bool {
-	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0
+	return result.Summary.WouldMerge > 0 || result.Summary.WouldRebase > 0 || result.Summary.WouldClose > 0
 }
 
 // updateSummary updates the run summary based on a PR result.
@@ -479,10 +531,16 @@ func (m *Merger) updateSummary(summary *output.RunSummary, pr output.PullRequest
 		summary.RebasedSuccess++
 	case output.ActionRebaseFailed:
 		summary.RebaseFailed++
+	case output.ActionClosed:
+		summary.ClosedSuccess++
+	case output.ActionCloseFailed:
+		summary.CloseFailed++
 	case output.ActionWouldMerge:
 		summary.WouldMerge++
 	case output.ActionWouldRebase:
 		summary.WouldRebase++
+	case output.ActionWouldClose:
+		summary.WouldClose++
 	case output.ActionReadyMerge:
 		summary.ReadyToMerge++
 	default:
@@ -611,10 +669,15 @@ func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) (
 // processPullRequest processes a single pull request and returns the result.
 func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest) output.PullRequestResult {
 	result := output.PullRequestResult{
-		Number:     pr.Number,
-		URL:        pr.URL,
-		HeadBranch: pr.HeadBranch,
-		Title:      pr.Title,
+		Number:           pr.Number,
+		URL:              pr.URL,
+		HeadBranch:       pr.HeadBranch,
+		Title:            pr.Title,
+		HeadRepoFullName: pr.HeadRepoFullName,
+	}
+
+	if m.config.Close {
+		return m.closePullRequest(ctx, owner, repo, pr, result)
 	}
 
 	// Get check status
@@ -674,6 +737,11 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 
 	// All conditions met, ready to merge
 	return m.handleMergeReady(ctx, owner, repo, pr, checksState)
+}
+
+func (m *Merger) closePullRequest(ctx context.Context, owner string, repo gh.Repository, pr gh.PullRequest, result output.PullRequestResult) output.PullRequestResult {
+	m.executeClose(ctx, owner, repo.Name, &result)
+	return result
 }
 
 // handleOutdatedBranch handles PRs where the branch is behind the default branch.

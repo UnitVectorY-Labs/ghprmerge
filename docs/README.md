@@ -11,10 +11,11 @@ permalink: /
 
 ghprmerge solves the problem of merging many similar pull requests across a GitHub organization. When you have dozens or hundreds of repositories with Dependabot (or similar automated) PRs, manually reviewing and merging each one becomes impractical.
 
-The tool provides three subcommands:
+The tool provides four subcommands:
 
 - **`merge`** — merge ready pull requests across an organization
 - **`rebase`** — update out-of-date PR branches across an organization
+- **`close`** — close matching pull requests, optionally deleting their source branches after a successful close
 - **`report`** — scan open PRs and group them by source branch name, helping you identify common updates that span multiple repositories
 
 The built-in CLI help (`ghprmerge --help`) includes these subcommand descriptions so users and automation agents can quickly select the correct mode without opening external documentation.
@@ -25,8 +26,8 @@ For every execution mode, place the subcommand first, then its flags (for exampl
 
 ghprmerge is designed to be **safe by default**:
 
-1. **Explicit subcommands** - Use `merge` to merge PRs, `rebase` to update branches, or `report` for a read-only overview
-2. **Confirmation mode** - Use `--confirm` with `merge` or `rebase` to preview what would happen before executing
+1. **Explicit subcommands** - Use `merge` to merge PRs, `rebase` to update branches, `close` to close unwanted PRs, or `report` for a read-only overview
+2. **Confirmation mode** - Use `--confirm` with `merge`, `rebase`, or `close` to preview what would happen before executing
 3. **Strict readiness checks** - A PR is only considered ready if:
    - All check runs have a successful conclusion (including non-required checks), or no checks are configured at all
    - All commit status contexts are successful, or no statuses are configured at all
@@ -85,6 +86,27 @@ For each repository (processed sequentially):
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
 
+### close command
+
+```
+scan → evaluate → close → optionally delete source branch → report
+```
+
+For each repository (processed sequentially):
+
+1. Fetch repository metadata including default branch (archived repositories are skipped)
+2. Enumerate candidate PRs matching `--source-branch` patterns (can be specified multiple times)
+3. For each candidate PR:
+   - Consider only open, non-draft PRs targeting the default branch; checks, mergeability, and branch currency do not affect close eligibility
+   - Close the PR
+   - If `--delete-source-branch` is set and the close succeeds, delete its source branch from the PR's head repository, including a fork when applicable
+   - Record the close and any deletion result immediately
+4. Show progress bar during scanning
+   - Stream each action result to the console immediately with the progress bar continuing below
+   - With `--verbose`, stream each repository result as soon as it is known
+   - With `--confirm`, scan without actions, prompt, then stream each action result during execution
+5. Print condensed summary
+
 ### report command
 
 ```
@@ -104,6 +126,7 @@ scan → collect open PRs → group by branch name → filter → sort → displ
 - [USAGE.md](USAGE.md) - Complete command-line reference with flag table
 - [MERGE.md](MERGE.md) - Merge subcommand details
 - [REBASE.md](REBASE.md) - Rebase subcommand details
+- [CLOSE.md](CLOSE.md) - Close subcommand details
 - [REPORT.md](REPORT.md) - Report subcommand details
 - [EXAMPLES.md](EXAMPLES.md) - Practical example commands and workflows
 - [INSTALL.md](INSTALL.md) - Installation instructions

@@ -40,6 +40,40 @@ For Dependabot branches, this posts a `@dependabot rebase` comment. For other br
 
 **Note**: `merge` and `rebase` are separate subcommands and cannot be combined. After rebasing, wait for checks to pass then run `merge`.
 
+## Close Run
+
+Close matching PRs without merging them:
+
+```bash
+ghprmerge close --org myorg --source-branch dependabot/
+```
+
+`close` considers open, non-draft PRs that target the default branch. It does not wait for checks, require an up-to-date branch, or perform merge-conflict checks.
+
+## Close and Delete Source Branches
+
+Close matching PRs and delete their source branches after each close succeeds:
+
+```bash
+ghprmerge close --org myorg --source-branch feature/ --delete-source-branch
+```
+
+`--delete-source-branch` deletes from the PR's head repository, including a fork when applicable, and only after the close succeeds.
+
+## Close by Author
+
+Close only PRs opened by a particular author:
+
+```bash
+ghprmerge close --author 'dependabot[bot]' --org myorg --source-branch dependabot/
+```
+
+Use confirmation mode to review matching PRs before closing them:
+
+```bash
+ghprmerge close --org myorg --source-branch feature/ --delete-source-branch --confirm
+```
+
 ## Merge Run
 
 Merge PRs that are already in a valid state (up-to-date, checks passing):
@@ -86,7 +120,7 @@ Scan all repositories first, then prompt before taking actions:
 ghprmerge rebase --org myorg --source-branch dependabot/ --confirm
 ```
 
-Use `--confirm` with either `merge` or `rebase` to preview planned actions before execution. Pending actions are listed, and on confirmation, execution progress is shown with a progress bar.
+Use `--confirm` with `merge`, `rebase`, or `close` to preview planned actions before execution. Pending actions are listed, and on confirmation, execution progress is shown with a progress bar.
 
 ```bash
 ghprmerge merge --org myorg --source-branch dependabot/ --confirm
@@ -157,6 +191,12 @@ Multiple source branches also work with the `rebase` subcommand:
 
 ```bash
 ghprmerge rebase --org myorg --source-branch dependabot/ --source-branch repver/
+```
+
+They also work with `close`:
+
+```bash
+ghprmerge close --org myorg --source-branch feature/ --source-branch stale/
 ```
 
 ## Dependabot Focused Run
@@ -270,6 +310,12 @@ Rebase only PRs opened by a specific user:
 
 ```bash
 ghprmerge rebase --author JaredHatfield --org myorg --source-branch feature/
+```
+
+Close only PRs opened by a specific user:
+
+```bash
+ghprmerge close --author JaredHatfield --org myorg --source-branch stale/
 ```
 
 Report on PRs from a specific author:
