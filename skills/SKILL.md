@@ -1,7 +1,7 @@
 ---
 name: ghprmerge
 description: >
-  Use this skill when you need to batch-evaluate, rebase, or merge GitHub pull
+  Use this skill when you need to batch-evaluate, rebase, merge, or close GitHub pull
   requests across multiple repositories in a GitHub organization. Useful for
   managing automated dependency updates (e.g., Dependabot) at scale.
 license: MIT
@@ -13,7 +13,7 @@ compatibility: standalone binary; requires GitHub API access via GITHUB_TOKEN or
 Batch-manage pull requests across a GitHub organization via the GitHub API. No local checkouts.
 
 ## Use this skill when
-- The user wants to merge or rebase PRs across many repositories in a GitHub org.
+- The user wants to merge, rebase, or close PRs across many repositories in a GitHub org.
 - The user needs a report of open PRs grouped by branch name across an organization.
 - The user mentions "batch merging", "bulk rebase", or "Dependabot management" for an organization.
 
@@ -28,7 +28,7 @@ Batch-manage pull requests across a GitHub organization via the GitHub API. No l
 
 ## Command Reference
 
-### Global flags (before subcommand)
+### Shared command flags
 | Flag | Default | Purpose |
 |---|---|---|
 | `--org` | `GITHUB_ORG` env | GitHub org to scan (required) |
@@ -41,7 +41,7 @@ Batch-manage pull requests across a GitHub organization via the GitHub API. No l
 | `--version` | — | Show version and exit |
 
 ### `merge` — merge ready PRs
-`ghprmerge --org <org> merge --source-branch <pattern> [flags]`
+`ghprmerge merge --org <org> --source-branch <pattern> [flags]`
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -51,7 +51,7 @@ Batch-manage pull requests across a GitHub organization via the GitHub API. No l
 | `--repo` | — | Additional repo filter (repeatable) |
 
 ### `rebase` — update stale PRs
-`ghprmerge --org <org> rebase --source-branch <pattern> [flags]`
+`ghprmerge rebase --org <org> --source-branch <pattern> [flags]`
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -59,8 +59,18 @@ Batch-manage pull requests across a GitHub organization via the GitHub API. No l
 | `--confirm` | `false` | Scan and prompt for confirmation before rebasing |
 | `--repo` | — | Additional repo filter (repeatable) |
 
+### `close` — close matching PRs
+`ghprmerge close --org <org> --source-branch <pattern> [flags]`
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--source-branch` | — | Branch pattern to match (required, repeatable, substring match) |
+| `--delete-source-branch` | `false` | Delete the source branch from the PR's head repository, including a fork when applicable, only after its PR is closed successfully |
+| `--confirm` | `false` | Scan and prompt for confirmation before closing |
+| `--repo` | — | Additional repo filter (repeatable) |
+
 ### `report` — read-only overview
-`ghprmerge --org <org> report [flags]`
+`ghprmerge report --org <org> [flags]`
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -69,7 +79,7 @@ Batch-manage pull requests across a GitHub organization via the GitHub API. No l
 | `--verbosity` | `standard` | `brief`, `standard`, or `verbose` |
 | `--repo` | — | Additional repo filter (repeatable) |
 
-**Note**: `report` uses `--source-branch-prefix` (prefix), not `--source-branch` (substring). `--skip-rebase` and `--confirm` are NOT valid with `report`.
+**Note**: `report` uses `--source-branch-prefix` (prefix), not `--source-branch` (substring). `--skip-rebase`, `--delete-source-branch`, and `--confirm` are NOT valid with `report`.
 
 ## Analysis-only mode
 Running `ghprmerge --org <org>` without a subcommand but with `--source-branch` evaluates PRs and shows results without performing mutations.
@@ -79,7 +89,8 @@ Running `ghprmerge --org <org>` without a subcommand but with `--source-branch` 
 - **Filtering**: Draft PRs, PRs not targeting the default branch, and non-matching patterns are silently filtered.
 - **Merge Logic**: Pending checks block merge. PRs with no configured checks proceed.
 - **Rebase Logic**: Rebase does not block on failing checks.
-- **Repo Limit**: `--repo-limit` marks remaining repos as skipped in merge/rebase; in report, they are silently dropped.
+- **Close Logic**: Close applies to matching open, non-draft PRs targeting the default branch. Checks, merge conflicts, and whether a branch is current do not block closing. `--delete-source-branch` deletes from the PR head repository, including a fork when applicable, only after a successful close. A deletion failure is reported as a partial failure; it does not reopen the PR.
+- **Repo Limit**: `--repo-limit` marks remaining repos as skipped in merge/rebase/close; in report, they are silently dropped.
 
 ## Skip reasons
 | Reason | Meaning |

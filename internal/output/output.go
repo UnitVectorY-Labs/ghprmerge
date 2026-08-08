@@ -14,6 +14,7 @@ const (
 	// Analysis mode actions (what would happen)
 	ActionWouldMerge  Action = "would merge"
 	ActionWouldRebase Action = "would rebase"
+	ActionWouldClose  Action = "would close"
 	ActionReadyMerge  Action = "ready to merge" // Ready but merge not enabled
 
 	// Execution mode actions (what happened)
@@ -21,6 +22,8 @@ const (
 	ActionMergeFailed  Action = "merge failed"
 	ActionRebased      Action = "rebased"
 	ActionRebaseFailed Action = "rebase failed"
+	ActionClosed       Action = "closed"
+	ActionCloseFailed  Action = "close failed"
 
 	// Skip reasons
 	ActionSkipNotTargetingDefault Action = "skip: not targeting default branch"
@@ -57,13 +60,14 @@ const (
 
 // PullRequestResult represents the result for a single pull request.
 type PullRequestResult struct {
-	Number     int        `json:"number"`
-	URL        string     `json:"url"`
-	HeadBranch string     `json:"head_branch"`
-	Title      string     `json:"title"`
-	Action     Action     `json:"action"`
-	Reason     string     `json:"reason,omitempty"`
-	SkipReason SkipReason `json:"skip_reason,omitempty"`
+	Number           int        `json:"number"`
+	URL              string     `json:"url"`
+	HeadBranch       string     `json:"head_branch"`
+	Title            string     `json:"title"`
+	HeadRepoFullName string     `json:"head_repo_full_name,omitempty"`
+	Action           Action     `json:"action"`
+	Reason           string     `json:"reason,omitempty"`
+	SkipReason       SkipReason `json:"skip_reason,omitempty"`
 }
 
 // RepositoryResult represents the results for a single repository.
@@ -90,6 +94,7 @@ type RunMetadata struct {
 	Mode          string    `json:"mode"`
 	Rebase        bool      `json:"rebase"`
 	Merge         bool      `json:"merge"`
+	Close         bool      `json:"close"`
 	RepoLimit     int       `json:"repo_limit,omitempty"`
 	RepoLimitDesc string    `json:"repo_limit_desc,omitempty"`
 	StartTime     time.Time `json:"start_time"`
@@ -105,8 +110,11 @@ type RunSummary struct {
 	MergeFailed     int            `json:"merge_failed"`
 	RebasedSuccess  int            `json:"rebased_success"`
 	RebaseFailed    int            `json:"rebase_failed"`
+	ClosedSuccess   int            `json:"closed_success"`
+	CloseFailed     int            `json:"close_failed"`
 	WouldMerge      int            `json:"would_merge,omitempty"`
 	WouldRebase     int            `json:"would_rebase,omitempty"`
+	WouldClose      int            `json:"would_close,omitempty"`
 	ReadyToMerge    int            `json:"ready_to_merge,omitempty"`
 	Skipped         int            `json:"skipped"`
 	SkippedByReason map[string]int `json:"skipped_by_reason,omitempty"`

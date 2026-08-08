@@ -14,6 +14,8 @@ type MockClient struct {
 	UpdateBranchErr map[string]error         // key: "owner/repo/prNumber"
 	PostRebaseErr   map[string]error         // key: "owner/repo/prNumber"
 	MergeErr        map[string]error         // key: "owner/repo/prNumber"
+	CloseErr        map[string]error         // key: "owner/repo/prNumber"
+	DeleteBranchErr map[string]error         // key: "owner/repo/branch"
 	ListReposErr    error
 	ListPRsErr      map[string]error // key: "owner/repo"
 	GetPRErr        map[string]error // key: "owner/repo/prNumber"
@@ -22,6 +24,8 @@ type MockClient struct {
 	UpdateBranchCalls []string
 	PostRebaseCalls   []string
 	MergeCalls        []string
+	CloseCalls        []string
+	DeleteBranchCalls []string
 }
 
 // NewMockClient creates a new MockClient with initialized maps.
@@ -34,11 +38,15 @@ func NewMockClient() *MockClient {
 		UpdateBranchErr:   make(map[string]error),
 		PostRebaseErr:     make(map[string]error),
 		MergeErr:          make(map[string]error),
+		CloseErr:          make(map[string]error),
+		DeleteBranchErr:   make(map[string]error),
 		ListPRsErr:        make(map[string]error),
 		GetPRErr:          make(map[string]error),
 		UpdateBranchCalls: []string{},
 		PostRebaseCalls:   []string{},
 		MergeCalls:        []string{},
+		CloseCalls:        []string{},
+		DeleteBranchCalls: []string{},
 	}
 }
 
@@ -123,6 +131,26 @@ func (m *MockClient) MergePullRequest(ctx context.Context, owner, repo string, p
 	key := owner + "/" + repo + "/" + string(rune(prNumber))
 	m.MergeCalls = append(m.MergeCalls, key)
 	if err, ok := m.MergeErr[key]; ok {
+		return err
+	}
+	return nil
+}
+
+// ClosePullRequest mocks closing a pull request.
+func (m *MockClient) ClosePullRequest(ctx context.Context, owner, repo string, prNumber int) error {
+	key := owner + "/" + repo + "/" + string(rune(prNumber))
+	m.CloseCalls = append(m.CloseCalls, key)
+	if err, ok := m.CloseErr[key]; ok {
+		return err
+	}
+	return nil
+}
+
+// DeleteBranch mocks deleting a branch.
+func (m *MockClient) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	key := owner + "/" + repo + "/" + branch
+	m.DeleteBranchCalls = append(m.DeleteBranchCalls, key)
+	if err, ok := m.DeleteBranchErr[key]; ok {
 		return err
 	}
 	return nil

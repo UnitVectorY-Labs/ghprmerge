@@ -2,7 +2,7 @@
 
 # ghprmerge
 
-A command-line tool to automatically evaluate, merge, and optionally rebase GitHub pull requests sharing the same source branch across an organization.
+A command-line tool to evaluate, merge, rebase, or close GitHub pull requests sharing the same source branch across an organization.
 
 Use case: merging automated dependency update pull requests (e.g., Dependabot) without requiring clicking through each repository individually.
 
@@ -27,6 +27,12 @@ ghprmerge rebase --org myorg --source-branch dependabot/
 # Merge ready PRs (that are already up-to-date)
 ghprmerge merge --org myorg --source-branch dependabot/
 
+# Close matching PRs without merging them
+ghprmerge close --org myorg --source-branch stale/
+
+# Delete source branches after successfully closing their PRs
+ghprmerge close --org myorg --source-branch stale/ --delete-source-branch
+
 # PRs with no checks configured are allowed; pending checks still block merging
 
 # Merge PRs even if behind (skip rebase requirement)
@@ -40,6 +46,9 @@ ghprmerge merge --org myorg --source-branch dependabot/ --source-branch feature/
 
 # Filter by author (e.g. only Dependabot PRs opened by the app)
 ghprmerge merge --author 'dependabot[bot]' --org myorg --source-branch dependabot/
+
+# Close PRs opened by a specific author
+ghprmerge close --author JaredHatfield --org myorg --source-branch stale/
 
 # Use --confirm to review pending actions before taking action
 ghprmerge rebase --org myorg --source-branch dependabot/ --confirm
@@ -67,6 +76,7 @@ ghprmerge report --org myorg --min-group-size 3
 - [Examples](docs/EXAMPLES.md) - Practical workflows
 - [Merge Command](docs/MERGE.md) - Merge subcommand details
 - [Rebase Command](docs/REBASE.md) - Rebase subcommand details
+- [Close Command](docs/CLOSE.md) - Close subcommand details
 - [Report Command](docs/REPORT.md) - Report subcommand details
 - [Installation](docs/INSTALL.md) - Installation instructions
 

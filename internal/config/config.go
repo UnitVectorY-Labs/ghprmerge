@@ -35,6 +35,7 @@ const (
 	CommandMerge  Command = "merge"
 	CommandRebase Command = "rebase"
 	CommandReport Command = "report"
+	CommandClose  Command = "close"
 )
 
 type CommandDescription struct {
@@ -55,6 +56,10 @@ var commandDescriptions = []CommandDescription{
 		Name:        CommandReport,
 		Description: "scan open pull requests and group them by source branch",
 	},
+	{
+		Name:        CommandClose,
+		Description: "close matching pull requests, optionally deleting their source branches",
+	},
 }
 
 // Config holds all configuration for ghprmerge.
@@ -64,6 +69,8 @@ type Config struct {
 	SourceBranch       string // First source branch (for backward compat in merger)
 	Rebase             bool
 	Merge              bool
+	Close              bool
+	DeleteSourceBranch bool
 	SkipRebase         bool
 	Repos              []string
 	RepoLimit          int
@@ -82,9 +89,9 @@ type Config struct {
 	Author             string
 }
 
-// IsAnalysisOnly returns true if neither rebase nor merge subcommand is used.
+// IsAnalysisOnly returns true if no mutating subcommand is used.
 func (c *Config) IsAnalysisOnly() bool {
-	return !c.Rebase && !c.Merge
+	return !c.Rebase && !c.Merge && !c.Close
 }
 
 // Validate checks that all required configuration is present.
@@ -160,7 +167,7 @@ var ErrHelp = flag.ErrHelp
 var ErrVersion = errors.New("version requested")
 
 // ParseFlags parses command-line flags and environment variables.
-// Supports subcommands: merge, rebase, report
+// Supports subcommands: merge, rebase, report, close
 // Usage: ghprmerge <command> [flags]
 func ParseFlags(args []string, version string) (*Config, error) {
 	if len(args) > 0 {
@@ -182,7 +189,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	subCmdIdx := -1
 	for i, arg := range args {
 		switch arg {
-		case "merge", "rebase", "report":
+		case "merge", "rebase", "report", "close":
 			command = Command(arg)
 			subCmdIdx = i
 		}
@@ -241,6 +248,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	var minMergeDelay int
 	var verbosity string
 	var repos StringSliceFlag
+	var deleteSourceBranch bool
 
 	if command != CommandNone {
 		subFS := flag.NewFlagSet(string(command), flag.ContinueOnError)
@@ -269,6 +277,11 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		case CommandRebase:
 			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
 			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
+			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
+		case CommandClose:
+			subFS.BoolVar(&verbose, "verbose", verbose, "Show all repositories including those with no matching pull requests")
+			subFS.Var(&sourceBranches, "source-branch", "Branch name pattern to match pull request head branches (repeatable)")
+			subFS.BoolVar(&deleteSourceBranch, "delete-source-branch", false, "Delete the pull request source branch after closing")
 			subFS.BoolVar(&confirm, "confirm", false, "Scan all repos first, then prompt for confirmation")
 		case CommandReport:
 			subFS.String("source-branch-prefix", "", "Comma-separated list of branch prefixes to include in report")
@@ -331,6 +344,8 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		SourceBranch:       sourceBranch,
 		Rebase:             command == CommandRebase,
 		Merge:              command == CommandMerge,
+		Close:              command == CommandClose,
+		DeleteSourceBranch: deleteSourceBranch,
 		SkipRebase:         skipRebase,
 		Repos:              repos,
 		RepoLimit:          repoLimit,
@@ -412,6 +427,8 @@ func commandHelpDescription(command Command) string {
 		return "rebase scans matching pull requests and updates branches that are behind their repositories' default branch. It does not merge pull requests."
 	case CommandReport:
 		return "report is read-only: it scans open pull requests, groups them by source branch, and reports the matching groups. It never merges or rebases."
+	case CommandClose:
+		return "close closes matching pull requests without checking merge readiness. With --delete-source-branch, it deletes each source branch after its pull request is closed."
 	default:
 		return ""
 	}
@@ -454,6 +471,12 @@ func printCommandFlags(w io.Writer, command Command) {
 		fmt.Fprintln(w, "  --source-branch-prefix <prefixes>  Comma-separated head-branch prefixes to include.")
 		fmt.Fprintln(w, "  --min-group-size <n>               Include only groups with at least n pull requests (default 2).")
 		fmt.Fprintln(w, "  --verbosity <level>                 Text detail: brief, standard, or verbose.")
+	case CommandClose:
+		fmt.Fprintln(w, "\nClose flags:")
+		fmt.Fprintln(w, "  --source-branch <pattern>  Pull request head-branch prefix to match; required and may be repeated.")
+		fmt.Fprintln(w, "  --delete-source-branch     Delete each source branch after its pull request is closed.")
+		fmt.Fprintln(w, "  --confirm                  Scan first, then prompt before closing candidates.")
+		fmt.Fprintln(w, "  --verbose                  Show repositories with no matching pull requests as they are scanned.")
 	}
 }
 

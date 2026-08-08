@@ -13,7 +13,7 @@ permalink: /usage
 ghprmerge <command> --org <organization> [flags]
 ```
 
-A subcommand is required. `--org` is required after that subcommand unless `GITHUB_ORG` is set. Choose `merge`, `rebase`, or `report`.
+A subcommand is required. `--org` is required after that subcommand unless `GITHUB_ORG` is set. Choose `merge`, `rebase`, `close`, or `report`.
 
 If you run `ghprmerge --help`, the CLI includes a short purpose line for each subcommand so you can quickly choose the right mode.
 
@@ -50,6 +50,7 @@ These flags can be used with every subcommand.
 |---------|-------------|---------|
 | `merge` | Merge pull requests that are in a valid state | [MERGE.md](MERGE.md) |
 | `rebase` | Update out-of-date branches | [REBASE.md](REBASE.md) |
+| `close` | Close matching pull requests, optionally deleting their source branches | [CLOSE.md](CLOSE.md) |
 | `report` | Scan and group open PRs by source branch | [REPORT.md](REPORT.md) |
 
 ## Command Behavior and Flags
@@ -74,6 +75,17 @@ Scans matching PRs and updates branches that are behind their repositories' defa
 |------|-------------|
 | `--source-branch <pattern>` | Required. Head-branch prefix to match; may be repeated. |
 | `--confirm` | Scan first, then prompt before rebasing candidates. |
+| `--verbose` | Stream repository results during scanning, including repos with no matching pull requests. |
+
+### `close`
+
+Scans matching PRs and closes open, non-draft PRs that target their repositories' default branches. Unlike `merge`, it does not require passing checks, no conflicts, or an up-to-date branch. Use `--delete-source-branch` to delete the source branch from its head repository only after its PR is closed successfully.
+
+| Flag | Description |
+|------|-------------|
+| `--source-branch <pattern>` | Required. Head-branch prefix to match; may be repeated. |
+| `--delete-source-branch` | After successfully closing a PR, delete its source branch from the PR's head repository, including a fork when applicable. |
+| `--confirm` | Scan first, then prompt before closing candidates. |
 | `--verbose` | Stream repository results during scanning, including repos with no matching pull requests. |
 
 ### `report`
@@ -130,6 +142,7 @@ If neither is available, execution fails immediately.
 - Read check runs and commit statuses
 - Comment on pull requests (for `rebase`)
 - Merge pull requests (for `merge`)
+- Close pull requests and delete source branches (for `close` with `--delete-source-branch`)
 
 ## Sequential Processing
 
@@ -138,8 +151,8 @@ Repositories are processed **one at a time**. The tool:
 - Never loads all org data before performing mutations
 - Never operates on multiple repos in parallel
 - Shows a progress bar as repositories are scanned
-- When an action is performed (merge or rebase), the result is streamed to the console immediately, with the progress bar continuing below
-- With `--verbose` (merge/rebase only), streams every repository result as soon as it is known
+- When an action is performed (merge, rebase, or close), the result is streamed to the console immediately, with the progress bar continuing below
+- With `--verbose` (merge/rebase/close only), streams every repository result as soon as it is known
 - With `--confirm`, streams action results during the execution phase after the user confirms
 
 ## Archived Repository Handling
@@ -173,6 +186,7 @@ Output uses colored text and Unicode symbols for clear, scannable results:
 
 - `✓` merged (green)
 - `↻` rebased (yellow)
+- `↻` closed (yellow)
 - `✗` failed (red)
 - `⊘` skipped (dim)
 
@@ -188,7 +202,7 @@ Each action result is streamed to the console as soon as it completes, with the 
   Scanning  15/25 [█████████████████████████████████                      ]  60%
 ```
 
-With `--verbose` (merge and rebase only), repository results are emitted live during scanning, including repositories with no matching pull requests:
+With `--verbose` (merge, rebase, and close only), repository results are emitted live during scanning, including repositories with no matching pull requests:
 ```
   ─ myorg/repo2 ─ no matching pull requests
   ✓ myorg/repo1 #42 Bump lodash to 4.17.21
@@ -216,6 +230,8 @@ Outputs structured JSON with:
 - Per-repository results
 - Per-PR decisions with action and reason
 - Summary statistics grouped by skip reason
+
+`close` uses the same JSON structure, with close actions and any branch-deletion outcome recorded for each PR.
 
 ## Dependabot Branch Handling
 

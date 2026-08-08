@@ -3,7 +3,9 @@ package merger
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -716,6 +718,105 @@ func TestMergerSourceBranchFiltering(t *testing.T) {
 	}
 	if result.Repositories[0].PullRequests[0].Number != 1 {
 		t.Errorf("Expected PR #1, got #%d", result.Repositories[0].PullRequests[0].Number)
+	}
+}
+
+func TestMergerCloseDeletesMatchingSourceBranch(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{{Name: "repo1", FullName: "testorg/repo1", DefaultBranch: "main"}}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{
+		{Number: 1, Title: "matching", HeadBranch: "dependabot/npm/foo", HeadRepoFullName: "dependabot/fork", BaseBranch: "main", Author: "dependabot[bot]"},
+		{Number: 2, Title: "wrong author", HeadBranch: "dependabot/npm/bar", BaseBranch: "main", Author: "other"},
+		{Number: 3, Title: "draft", HeadBranch: "dependabot/npm/baz", BaseBranch: "main", Author: "dependabot[bot]", Draft: true},
+	}
+
+	m := New(mock, &config.Config{
+		Org:                "testorg",
+		SourceBranches:     []string{"dependabot/"},
+		SourceBranch:       "dependabot/",
+		Author:             "dependabot[bot]",
+		Close:              true,
+		DeleteSourceBranch: true,
+	}, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(mock.CloseCalls) != 1 {
+		t.Fatalf("ClosePullRequest called %d times, want 1", len(mock.CloseCalls))
+	}
+	if got, want := mock.DeleteBranchCalls, []string{"dependabot/fork/dependabot/npm/foo"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("DeleteBranchCalls = %v, want %v", got, want)
+	}
+	if result.Summary.ClosedSuccess != 1 || result.Summary.CloseFailed != 0 {
+		t.Errorf("close summary = %+v, want one successful close", result.Summary)
+	}
+	if got := result.Repositories[0].PullRequests[0]; got.Action != output.ActionClosed || got.Reason != "successfully closed and source branch deleted" {
+		t.Errorf("close result = %+v, want successful close with deleted branch", got)
+	}
+}
+
+func TestMergerCloseReportsSourceBranchDeletionFailure(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{{Name: "repo1", FullName: "testorg/repo1", DefaultBranch: "main"}}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{{Number: 1, HeadBranch: "feature/foo", HeadRepoFullName: "testorg/repo1", BaseBranch: "main"}}
+	mock.DeleteBranchErr["testorg/repo1/feature/foo"] = errors.New("forbidden")
+
+	m := New(mock, &config.Config{
+		Org:                "testorg",
+		SourceBranches:     []string{"feature/"},
+		SourceBranch:       "feature/",
+		Close:              true,
+		DeleteSourceBranch: true,
+	}, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if result.Summary.CloseFailed != 1 || result.Summary.ClosedSuccess != 0 {
+		t.Errorf("close summary = %+v, want one close failure", result.Summary)
+	}
+	got := result.Repositories[0].PullRequests[0]
+	if got.Action != output.ActionCloseFailed || !strings.Contains(got.Reason, "closed, but source branch deletion failed") {
+		t.Errorf("close result = %+v, want partial deletion failure", got)
+	}
+}
+
+func TestMergerCloseDoesNotDeleteBranchWhenCloseFails(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{{Name: "repo1", FullName: "testorg/repo1", DefaultBranch: "main"}}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{{Number: 1, HeadBranch: "feature/foo", HeadRepoFullName: "testorg/repo1", BaseBranch: "main"}}
+	mock.CloseErr["testorg/repo1/\x01"] = errors.New("forbidden")
+
+	m := New(mock, &config.Config{Org: "testorg", SourceBranches: []string{"feature/"}, SourceBranch: "feature/", Close: true, DeleteSourceBranch: true}, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(mock.DeleteBranchCalls) != 0 {
+		t.Errorf("DeleteBranch called %d times, want 0 after close failure", len(mock.DeleteBranchCalls))
+	}
+	if result.Summary.CloseFailed != 1 || result.Repositories[0].PullRequests[0].Action != output.ActionCloseFailed {
+		t.Errorf("close result = %+v, want close failure", result)
+	}
+}
+
+func TestMergerCloseDoesNotDeleteBranchWithoutHeadRepository(t *testing.T) {
+	mock := github.NewMockClient()
+	mock.Repositories = []github.Repository{{Name: "repo1", FullName: "testorg/repo1", DefaultBranch: "main"}}
+	mock.PullRequests["testorg/repo1"] = []github.PullRequest{{Number: 1, HeadBranch: "feature/foo", BaseBranch: "main"}}
+
+	m := New(mock, &config.Config{Org: "testorg", SourceBranches: []string{"feature/"}, SourceBranch: "feature/", Close: true, DeleteSourceBranch: true}, nil)
+	result, err := m.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(mock.DeleteBranchCalls) != 0 {
+		t.Errorf("DeleteBranch called %d times, want 0 without a head repository", len(mock.DeleteBranchCalls))
+	}
+	got := result.Repositories[0].PullRequests[0]
+	if got.Action != output.ActionCloseFailed || !strings.Contains(got.Reason, "could not determine source repository") {
+		t.Errorf("close result = %+v, want missing head repository failure", got)
 	}
 }
 

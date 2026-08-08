@@ -273,11 +273,17 @@ func (c *Console) PrintSummary(summary RunSummary) {
 	if summary.RebasedSuccess > 0 {
 		parts = append(parts, c.Yellow(fmt.Sprintf("%d rebased", summary.RebasedSuccess)))
 	}
+	if summary.ClosedSuccess > 0 {
+		parts = append(parts, c.Yellow(fmt.Sprintf("%d closed", summary.ClosedSuccess)))
+	}
 	if summary.WouldMerge > 0 {
 		parts = append(parts, c.Green(fmt.Sprintf("%d would merge", summary.WouldMerge)))
 	}
 	if summary.WouldRebase > 0 {
 		parts = append(parts, c.Yellow(fmt.Sprintf("%d would rebase", summary.WouldRebase)))
+	}
+	if summary.WouldClose > 0 {
+		parts = append(parts, c.Yellow(fmt.Sprintf("%d would close", summary.WouldClose)))
 	}
 	if summary.ReadyToMerge > 0 {
 		parts = append(parts, c.Green(fmt.Sprintf("%d ready to merge", summary.ReadyToMerge)))
@@ -287,6 +293,9 @@ func (c *Console) PrintSummary(summary RunSummary) {
 	}
 	if summary.RebaseFailed > 0 {
 		parts = append(parts, c.Red(fmt.Sprintf("%d rebase failed", summary.RebaseFailed)))
+	}
+	if summary.CloseFailed > 0 {
+		parts = append(parts, c.Red(fmt.Sprintf("%d close failed", summary.CloseFailed)))
 	}
 	if summary.Skipped > 0 {
 		parts = append(parts, c.Dim(fmt.Sprintf("%d skipped", summary.Skipped)))
@@ -300,9 +309,9 @@ func (c *Console) getActionSymbol(action Action) string {
 	switch action {
 	case ActionMerged, ActionWouldMerge, ActionReadyMerge:
 		return "✓"
-	case ActionRebased, ActionWouldRebase:
+	case ActionRebased, ActionWouldRebase, ActionClosed, ActionWouldClose:
 		return "↻"
-	case ActionMergeFailed, ActionRebaseFailed:
+	case ActionMergeFailed, ActionRebaseFailed, ActionCloseFailed:
 		return "✗"
 	default:
 		if strings.HasPrefix(string(action), "skip:") {
@@ -317,9 +326,9 @@ func (c *Console) colorAction(symbol string, action Action) string {
 	switch action {
 	case ActionMerged, ActionWouldMerge, ActionReadyMerge:
 		return c.Green(symbol)
-	case ActionRebased, ActionWouldRebase:
+	case ActionRebased, ActionWouldRebase, ActionClosed, ActionWouldClose:
 		return c.Yellow(symbol)
-	case ActionMergeFailed, ActionRebaseFailed:
+	case ActionMergeFailed, ActionRebaseFailed, ActionCloseFailed:
 		return c.Red(symbol)
 	default:
 		if strings.HasPrefix(string(action), "skip:") {
@@ -334,9 +343,9 @@ func (c *Console) colorActionText(text string, action Action) string {
 	switch action {
 	case ActionMerged, ActionWouldMerge, ActionReadyMerge:
 		return c.Green(text)
-	case ActionRebased, ActionWouldRebase:
+	case ActionRebased, ActionWouldRebase, ActionClosed, ActionWouldClose:
 		return c.Yellow(text)
-	case ActionMergeFailed, ActionRebaseFailed:
+	case ActionMergeFailed, ActionRebaseFailed, ActionCloseFailed:
 		return c.Red(text)
 	default:
 		return c.Dim(text)
