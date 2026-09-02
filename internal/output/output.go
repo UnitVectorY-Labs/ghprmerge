@@ -91,6 +91,7 @@ type RunResult struct {
 type RunMetadata struct {
 	Org           string    `json:"org"`
 	SourceBranch  string    `json:"source_branch"`
+	Author        string    `json:"author,omitempty"`
 	Mode          string    `json:"mode"`
 	Rebase        bool      `json:"rebase"`
 	Merge         bool      `json:"merge"`
