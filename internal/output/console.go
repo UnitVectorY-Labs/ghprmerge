@@ -213,9 +213,13 @@ func (c *Console) ClearLines(n int) {
 }
 
 // PrintHeader prints the application header.
-func (c *Console) PrintHeader(org, mode, branch string) {
+func (c *Console) PrintHeader(org, mode, branch, author string) {
 	fmt.Fprintf(c.w, "%s %s\n", c.Bold(c.Cyan("ghprmerge")), c.Dim("─ "+org))
-	fmt.Fprintf(c.w, "%s\n", c.Dim(fmt.Sprintf("Mode: %s │ Branch: %s", mode, branch)))
+	line := fmt.Sprintf("Mode: %s │ Branch: %s", mode, branch)
+	if author != "" {
+		line += fmt.Sprintf(" │ Author: %s", author)
+	}
+	fmt.Fprintf(c.w, "%s\n", c.Dim(line))
 }
 
 // PrintRepoResult prints the result for a single repository's pull requests.

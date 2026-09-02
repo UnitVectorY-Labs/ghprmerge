@@ -100,7 +100,7 @@ func TestConsolePrintHeader(t *testing.T) {
 	var buf bytes.Buffer
 	c := NewConsole(&buf, true, false, false)
 
-	c.PrintHeader("myorg", "merge mode", "dependabot/")
+	c.PrintHeader("myorg", "merge mode", "dependabot/", "")
 	output := buf.String()
 
 	if !strings.Contains(output, "ghprmerge") {
@@ -114,6 +114,21 @@ func TestConsolePrintHeader(t *testing.T) {
 	}
 	if !strings.Contains(output, "dependabot/") {
 		t.Errorf("Expected 'dependabot/' in header, got: %q", output)
+	}
+	if strings.Contains(output, "Author:") {
+		t.Errorf("Expected no author in header when author is empty, got: %q", output)
+	}
+}
+
+func TestConsolePrintHeaderWithAuthor(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf, true, false, false)
+
+	c.PrintHeader("myorg", "merge mode", "dependabot/", "dependabot[bot]")
+	output := buf.String()
+
+	if !strings.Contains(output, "Author: dependabot[bot]") {
+		t.Errorf("Expected 'Author: dependabot[bot]' in header, got: %q", output)
 	}
 }
 

@@ -184,6 +184,11 @@ Pull requests with no checks configured are allowed to proceed. Pending checks s
 
 Output uses colored text and Unicode symbols for clear, scannable results:
 
+The header line shows the run's mode and source branch, plus the author filter when `--author` is set:
+```
+Mode: merge mode │ Branch: dependabot/ │ Author: dependabot[bot]
+```
+
 - `✓` merged (green)
 - `↻` rebased (yellow)
 - `↻` closed (yellow)

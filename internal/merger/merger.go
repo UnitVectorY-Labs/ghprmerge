@@ -53,6 +53,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		Metadata: output.RunMetadata{
 			Org:           m.config.Org,
 			SourceBranch:  sourceBranchDesc,
+			Author:        m.config.Author,
 			Mode:          mode,
 			Rebase:        m.config.Rebase,
 			Merge:         m.config.Merge,
@@ -75,7 +76,7 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 
 	// Print header and start progress
 	if m.console != nil && !m.config.JSON {
-		m.console.PrintHeader(m.config.Org, mode, sourceBranchDesc)
+		m.console.PrintHeader(m.config.Org, mode, sourceBranchDesc, m.config.Author)
 		if m.config.RepoLimit > 0 {
 			fmt.Fprintf(m.console.Writer(), "%s\n", m.console.Dim(fmt.Sprintf("Limit: %d repositories max", m.config.RepoLimit)))
 		}
