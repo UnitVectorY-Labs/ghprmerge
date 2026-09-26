@@ -55,7 +55,7 @@ func run() error {
 	}
 
 	// Create GitHub client
-	client := github.NewRealClient(cfg.Token)
+	client := github.NewRateLimitedClient(github.NewRealClient(cfg.Token))
 
 	// Create console for terminal output (nil if JSON mode)
 	var console *output.Console

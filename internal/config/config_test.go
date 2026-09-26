@@ -969,3 +969,22 @@ func TestBuildVersionOutputNoVPrefixForDev(t *testing.T) {
 		t.Fatalf("unexpected version output: got %q, want %q", got, want)
 	}
 }
+
+func TestWorkers(t *testing.T) {
+	for _, command := range []string{"merge", "rebase", "close", "report"} {
+		for _, value := range []string{"1", "4", "0", "-2", "bad"} {
+			cfg, err := ParseFlags([]string{command, "--workers", value}, "test")
+			valid := value == "1" || value == "4"
+			if valid && (err != nil || cfg.Workers < 1) {
+				t.Fatalf("%s %s: %v", command, value, err)
+			}
+			if !valid && err == nil {
+				t.Fatalf("accepted %s", value)
+			}
+		}
+		cfg, err := ParseFlags([]string{command}, "test")
+		if err != nil || cfg.Workers != 1 {
+			t.Fatalf("default %s: %v", command, err)
+		}
+	}
+}

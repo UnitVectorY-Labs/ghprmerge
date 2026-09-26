@@ -375,3 +375,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: ./ghprmerge merge --org myorg --no-progress --repo-limit 20 --source-branch dependabot/
 ```
+
+## Parallel processing
+
+Use four repository workers to speed up scans and independent actions:
+
+```bash
+ghprmerge report --org myorg --workers 4
+ghprmerge merge --org myorg --source-branch dependabot/ --workers 4 --min-merge-delay 2 --confirm
+ghprmerge rebase --org myorg --source-branch dependabot/ --workers 4
+ghprmerge close --org myorg --source-branch obsolete/ --workers 4 --confirm
+```
+
+The default is one worker. PRs within each repository stay sequential. Start with a modest worker count: higher concurrency can reach GitHub rate limits sooner. Workers share rate-limit cooldowns and bounded retries. `--min-merge-delay` spaces merge requests across all workers.

@@ -74,6 +74,7 @@ type Config struct {
 	SkipRebase         bool
 	Repos              []string
 	RepoLimit          int
+	Workers            int
 	JSON               bool
 	Confirm            bool
 	Verbose            bool
@@ -101,6 +102,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Token == "" {
 		return fmt.Errorf("no GitHub token found: set GITHUB_TOKEN environment variable or authenticate with 'gh auth login'")
+	}
+	if c.Workers < 0 {
+		return fmt.Errorf("--workers must be at least 1")
 	}
 	if c.MinMergeDelay < 0 {
 		return fmt.Errorf("--min-merge-delay must be 0 or greater")
@@ -207,6 +211,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 	org := os.Getenv("GITHUB_ORG")
 	repoLimit := 0
+	workers := 1
 	jsonOutput := false
 	verbose := false
 	noColor := false
@@ -257,6 +262,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		}
 		subFS.StringVar(&org, "org", org, "GitHub organization to scan")
 		subFS.Var(&repos, "repo", "Exact repository name in the organization to scan (may be repeated)")
+		subFS.IntVar(&workers, "workers", workers, "Number of repositories to process in parallel (must be at least 1)")
 		subFS.IntVar(&repoLimit, "repo-limit", repoLimit, "Maximum number of repositories to process (0 = unlimited)")
 		subFS.BoolVar(&jsonOutput, "json", jsonOutput, "Output structured JSON instead of human-readable text")
 		subFS.BoolVar(&noColor, "no-color", noColor, "Disable colored output")
@@ -298,6 +304,10 @@ func ParseFlags(args []string, version string) (*Config, error) {
 
 		if err := subFS.Parse(subArgs); err != nil {
 			return nil, err
+		}
+
+		if workers < 1 {
+			return nil, fmt.Errorf("--workers must be at least 1")
 		}
 
 		// Extract report-specific parsed values
@@ -349,6 +359,7 @@ func ParseFlags(args []string, version string) (*Config, error) {
 		SkipRebase:         skipRebase,
 		Repos:              repos,
 		RepoLimit:          repoLimit,
+		Workers:            workers,
 		JSON:               jsonOutput,
 		Confirm:            confirm,
 		Verbose:            verbose,

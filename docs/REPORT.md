@@ -30,6 +30,7 @@ The report subcommand discovers repositories using the same logic as the `merge`
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -55,7 +56,7 @@ These flags are placed after `report`.
 
 ## Behavior
 
-The report subcommand processes repositories sequentially using the same discovery logic as the `merge` and `rebase` subcommands:
+The report subcommand processes repositories with `--workers` workers (default: one) using the same discovery logic as the `merge` and `rebase` subcommands:
 
 1. **Discover repositories**: Enumerate repositories in the organization, respecting `--repo` and `--repo-limit` filters. Archived repositories are excluded.
 2. **Collect open PRs**: For each repository, list all open pull requests that are not drafts and target the default branch.

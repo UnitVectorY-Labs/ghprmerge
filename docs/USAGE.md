@@ -32,6 +32,7 @@ Use these to narrow the repositories or pull requests that a command considers.
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the selected organization. Repeat for multiple repositories, such as `--repo api --repo web`. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login, such as `dependabot[bot]`. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -144,14 +145,14 @@ If neither is available, execution fails immediately.
 - Merge pull requests (for `merge`)
 - Close pull requests and delete source branches (for `close` with `--delete-source-branch`)
 
-## Sequential Processing
+## Repository Processing
 
-Repositories are processed **one at a time**. The tool:
+Repositories are processed with **one worker by default**; use `--workers` for parallel processing. The tool:
 
 - Never loads all org data before performing mutations
-- Never operates on multiple repos in parallel
+- Processes up to `--workers` repositories concurrently (default: `1`); PRs within each repository stay sequential
 - Shows a progress bar as repositories are scanned
-- When an action is performed (merge, rebase, or close), the result is streamed to the console immediately, with the progress bar continuing below
+- When an action is performed (merge, rebase, or close), the result is streamed to the console when its repository finishes, with the progress bar continuing below
 - With `--verbose` (merge/rebase/close only), streams every repository result as soon as it is known
 - With `--confirm`, streams action results during the execution phase after the user confirms
 
@@ -268,3 +269,13 @@ ghprmerge merge --repo-limit 10 --org myorg --source-branch dependabot/
 ```
 
 Output will show: `Limit: 10 repositories max`
+
+## Parallel workers and rate limits
+
+`--workers <n>` is available on `merge`, `rebase`, `close`, and `report`; the default is `1`, and zero or negative values are rejected. Repository discovery remains sequential. Repository scans, report status evaluation, and actions use up to the configured number of workers. PRs within a repository remain sequential. With `--confirm`, all scanning finishes before the prompt, and the action phase uses the same worker count.
+
+`--repo-limit` reserves slots for in-flight repositories so parallel actions cannot exceed the limit. Repository API failures release their slots. Final repository results retain discovery order; live repository blocks appear in completion order. A single coordinator owns console writes, progress counts, and summaries, preventing interleaved output. `--no-progress` suppresses the progress bar while retaining results; `--json` emits only the final structured result.
+
+All workers share a cooldown when GitHub reports a primary or secondary rate limit. Primary limits wait until the reset time (plus one second); secondary limits honor `Retry-After`, or back off for 60, 120, then 240 seconds when no delay is supplied. A request gets at most three retries; exhausted retries follow the usual API-error reporting behavior. Waits respect context cancellation. Ordinary permission errors and ambiguous network/mutation failures are not retried. Requests already in flight may finish during a cooldown.
+
+Higher worker counts do not increase your GitHub quota. Start with a modest count such as `4`. For merges, `--min-merge-delay` remains a global interval across workers; scans and checks can proceed during that delay. See [GitHub rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).

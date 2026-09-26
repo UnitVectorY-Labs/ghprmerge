@@ -33,13 +33,13 @@ ghprmerge is designed to be **safe by default**:
    - All commit status contexts are successful, or no statuses are configured at all
    - No merge conflicts
    - Branch is fully up to date with the default branch (unless `--skip-rebase` is used with `merge`)
-4. **Sequential processing** - Repositories are processed one at a time, never in parallel
+4. **Repository workers** - `--workers <n>` controls concurrent repository processing (default: `1`). A single coordinator serializes output and progress updates.
 5. **No local checkout** - All operations use the GitHub API
 
 ## Non-Goals
 
 - No local git operations or repository checkouts
-- No parallel repository operations
+- Repository concurrency is bounded by `--workers`; PRs in each repository remain sequential
 - No creating or approving pull requests
 - No modifying repository settings
 
@@ -51,7 +51,7 @@ ghprmerge is designed to be **safe by default**:
 scan → evaluate → merge → report
 ```
 
-For each repository (processed sequentially):
+For each repository (up to `--workers` repositories at a time; PRs within each repository remain sequential):
 
 1. Fetch repository metadata including default branch (archived repositories are skipped)
 2. Enumerate candidate PRs matching `--source-branch` patterns (can be specified multiple times)
@@ -61,7 +61,7 @@ For each repository (processed sequentially):
    - With `--skip-rebase`: attempt merge even if branch is behind
    - Record result immediately
 4. Show progress bar during scanning. The merge delay is applied only immediately before a merge request; it is not a scanning delay.
-   - Stream each action result to the console immediately with the progress bar continuing below
+   - Stream action results as complete repository blocks when each repository finishes with the progress bar continuing below
    - With `--verbose`, stream each repository result as soon as it is known
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
@@ -72,7 +72,7 @@ For each repository (processed sequentially):
 scan → evaluate → rebase → report
 ```
 
-For each repository (processed sequentially):
+For each repository (up to `--workers` repositories at a time; PRs within each repository remain sequential):
 
 1. Fetch repository metadata including default branch (archived repositories are skipped)
 2. Enumerate candidate PRs matching `--source-branch` patterns (can be specified multiple times)
@@ -81,7 +81,7 @@ For each repository (processed sequentially):
    - Update branch if behind
    - Record result immediately
 4. Show progress bar during scanning
-   - Stream each action result to the console immediately with the progress bar continuing below
+   - Stream action results as complete repository blocks when each repository finishes with the progress bar continuing below
    - With `--verbose`, stream each repository result as soon as it is known
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
@@ -92,7 +92,7 @@ For each repository (processed sequentially):
 scan → evaluate → close → optionally delete source branch → report
 ```
 
-For each repository (processed sequentially):
+For each repository (up to `--workers` repositories at a time; PRs within each repository remain sequential):
 
 1. Fetch repository metadata including default branch (archived repositories are skipped)
 2. Enumerate candidate PRs matching `--source-branch` patterns (can be specified multiple times)
@@ -102,7 +102,7 @@ For each repository (processed sequentially):
    - If `--delete-source-branch` is set and the close succeeds, delete its source branch from the PR's head repository, including a fork when applicable
    - Record the close and any deletion result immediately
 4. Show progress bar during scanning
-   - Stream each action result to the console immediately with the progress bar continuing below
+   - Stream action results as complete repository blocks when each repository finishes with the progress bar continuing below
    - With `--verbose`, stream each repository result as soon as it is known
    - With `--confirm`, scan without actions, prompt, then stream each action result during execution
 5. Print condensed summary
