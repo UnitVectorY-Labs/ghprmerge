@@ -30,6 +30,7 @@ The merge subcommand scans repositories for PRs matching the specified source br
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -54,7 +55,7 @@ These flags are placed after `merge`.
 
 ## Behavior
 
-The merge subcommand processes repositories sequentially and evaluates each matching PR against the following criteria:
+The merge subcommand processes repositories with `--workers` workers (default: one) and evaluates each matching PR against the following criteria:
 
 - **Up-to-date**: The PR branch must not be behind the default branch. PRs that are behind are skipped unless `--skip-rebase` is used.
 - **Checks passing**: All required status checks must have completed successfully. PRs with failing checks are skipped.

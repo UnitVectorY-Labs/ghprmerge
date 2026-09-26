@@ -30,6 +30,7 @@ The rebase subcommand scans repositories for PRs matching the specified source b
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -53,7 +54,7 @@ These flags are placed after `rebase`.
 
 ## Behavior
 
-The rebase subcommand processes repositories sequentially and updates branches that are behind the default branch. Unlike the merge subcommand, failing or pending checks are **not** blocking — rebasing may resolve the issues causing check failures, so the tool does not gate on check status.
+The rebase subcommand processes repositories with `--workers` workers (default: one) and updates branches that are behind the default branch. Unlike the merge subcommand, failing or pending checks are **not** blocking — rebasing may resolve the issues causing check failures, so the tool does not gate on check status.
 
 Key behavioral properties:
 

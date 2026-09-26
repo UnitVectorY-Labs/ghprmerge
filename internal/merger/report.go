@@ -27,7 +27,6 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 		}
 	}
 
-	repoCount := 0
 	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && len(repos) > 0
 
 	// Collect all open PRs from all repositories
@@ -39,27 +38,20 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 
 	var allPRs []prEntry
 
-	for i, repo := range repos {
-		if showProgress {
-			m.console.ProgressBar(i+1, len(repos), "Scanning")
-		}
-
-		// Check repo limit
-		if m.config.RepoLimit > 0 && repoCount >= m.config.RepoLimit {
-			continue
-		}
-
+	type scan struct {
+		entries []prEntry
+		ok      bool
+	}
+	scans := make([]scan, len(repos))
+	completed := 0
+	err = parallel(ctx, len(repos), m.config.Workers, m.config.RepoLimit, func(i int) scan {
+		repo := repos[i]
 		owner := strings.Split(repo.FullName, "/")[0]
-
-		// List all open PRs for this repo (reuses existing client call)
 		prs, err := m.client.ListPullRequests(ctx, owner, repo.Name, repo.DefaultBranch)
 		if err != nil {
-			// Skip repos with API errors in report mode
-			continue
+			return scan{}
 		}
-
-		repoCount++
-
+		var entries []prEntry
 		for _, pr := range prs {
 			// Skip draft PRs
 			if pr.Draft {
@@ -90,11 +82,25 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 				continue
 			}
 
-			allPRs = append(allPRs, prEntry{
+			entries = append(entries, prEntry{
 				repoName: repo.Name,
 				pr:       pr,
 			})
 		}
+		return scan{entries, true}
+	}, func(i int, value scan, limited bool) bool {
+		scans[i] = value
+		completed++
+		if showProgress {
+			m.console.ProgressBar(completed, len(repos), "Scanning")
+		}
+		return value.ok
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, scan := range scans {
+		allPRs = append(allPRs, scan.entries...)
 	}
 
 	// Finish progress bar
@@ -151,48 +157,46 @@ func (m *Merger) RunReport(ctx context.Context) (*output.ReportResult, error) {
 		Groups: make([]output.ReportGroup, 0, len(groups)),
 	}
 
-	if showProgress && needsStatus && len(groups) > 0 {
-		// Count total PRs that need evaluation
-		totalPRs := 0
-		for _, g := range groups {
-			totalPRs += len(g.prs)
-		}
-		evalCount := 0
-
-		for _, g := range groups {
-			rg := output.ReportGroup{
-				SourceBranch: g.branch,
-				Count:        len(g.prs),
-				PullRequests: make([]output.ReportPullRequest, 0, len(g.prs)),
+	// Group evaluation jobs by repository to keep its PRs sequential, even
+	// when they belong to different source-branch groups.
+	type evaluation struct {
+		group, pr int
+		entry     prEntry
+	}
+	var jobs [][]evaluation
+	repoJobs := make(map[string]int)
+	totalPRs := 0
+	for gi, g := range groups {
+		result.Groups = append(result.Groups, output.ReportGroup{SourceBranch: g.branch, Count: len(g.prs), PullRequests: make([]output.ReportPullRequest, len(g.prs))})
+		for pi, entry := range g.prs {
+			index, exists := repoJobs[entry.repoName]
+			if !exists {
+				index = len(jobs)
+				repoJobs[entry.repoName] = index
+				jobs = append(jobs, nil)
 			}
-
-			for _, entry := range g.prs {
-				evalCount++
-				m.console.ProgressBar(evalCount, totalPRs, "Evaluating")
-
-				rpr := m.buildReportPR(ctx, entry.repoName, entry.pr, needsStatus, verbosity)
-				rg.PullRequests = append(rg.PullRequests, rpr)
-			}
-
-			result.Groups = append(result.Groups, rg)
+			jobs[index] = append(jobs[index], evaluation{gi, pi, entry})
+			totalPRs++
 		}
-
+	}
+	evaluated := 0
+	err = parallel(ctx, len(jobs), m.config.Workers, 0, func(i int) int {
+		for _, job := range jobs[i] {
+			result.Groups[job.group].PullRequests[job.pr] = m.buildReportPR(ctx, job.entry.repoName, job.entry.pr, needsStatus, verbosity)
+		}
+		return len(jobs[i])
+	}, func(i, count int, _ bool) bool {
+		evaluated += count
+		if showProgress && needsStatus {
+			m.console.ProgressBar(evaluated, totalPRs, "Evaluating")
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	if showProgress && needsStatus && totalPRs > 0 {
 		m.console.FinishProgress()
-	} else {
-		for _, g := range groups {
-			rg := output.ReportGroup{
-				SourceBranch: g.branch,
-				Count:        len(g.prs),
-				PullRequests: make([]output.ReportPullRequest, 0, len(g.prs)),
-			}
-
-			for _, entry := range g.prs {
-				rpr := m.buildReportPR(ctx, entry.repoName, entry.pr, needsStatus, verbosity)
-				rg.PullRequests = append(rg.PullRequests, rpr)
-			}
-
-			result.Groups = append(result.Groups, rg)
-		}
 	}
 
 	return result, nil

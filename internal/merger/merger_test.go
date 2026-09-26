@@ -1805,3 +1805,60 @@ func TestMergerMultipleSourceBranchesConcurrentSkip(t *testing.T) {
 		t.Errorf("MergedSuccess = %d, want 1", result.Summary.MergedSuccess)
 	}
 }
+
+func TestParallelCommands(t *testing.T) {
+	for _, mode := range []string{"merge", "rebase", "close", "report"} {
+		for _, confirm := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/confirm=%t", mode, confirm), func(t *testing.T) {
+				mock := github.NewMockClient()
+				for i := 0; i < 12; i++ {
+					name := fmt.Sprintf("repo%02d", i)
+					mock.Repositories = append(mock.Repositories, github.Repository{Name: name, FullName: "org/" + name, DefaultBranch: "main"})
+					mock.PullRequests["org/"+name] = []github.PullRequest{{Number: 1, HeadBranch: "feature", BaseBranch: "main", RepoFullName: "org/" + name, HeadSHA: "sha"}}
+					if mode == "rebase" {
+						mock.BranchStatuses["org/"+name+"/"+string(rune(1))] = &github.BranchStatus{BehindBy: 1}
+					}
+				}
+				cfg := &config.Config{Org: "org", Workers: 4, SourceBranches: []string{"feature"}, Merge: mode == "merge", Rebase: mode == "rebase", Close: mode == "close", Confirm: confirm, MinGroupSize: 1, Verbose: true}
+				var buf bytes.Buffer
+				m := New(mock, cfg, output.NewConsole(&buf, true, true, false))
+				if mode == "report" {
+					result, err := m.RunReport(context.Background())
+					if err != nil || len(result.Groups) != 1 || result.Groups[0].Count != 12 {
+						t.Fatalf("result=%+v err=%v", result, err)
+					}
+					for i, pr := range result.Groups[0].PullRequests {
+						if pr.Repository != mock.Repositories[i].Name {
+							t.Fatal("report order changed")
+						}
+					}
+					return
+				}
+				result, err := m.Run(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if confirm {
+					if len(mock.MergeCalls)+len(mock.UpdateBranchCalls)+len(mock.CloseCalls) != 0 {
+						t.Fatal("actions before confirmation")
+					}
+					result, err = m.RunWithActions(context.Background(), result)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if result.Summary.ReposProcessed != 12 {
+					t.Fatalf("summary=%+v", result.Summary)
+				}
+				for i, repo := range result.Repositories {
+					if repo.Name != mock.Repositories[i].Name {
+						t.Fatal("repository order changed")
+					}
+				}
+				if len(mock.MergeCalls)+len(mock.UpdateBranchCalls)+len(mock.CloseCalls) != 12 {
+					t.Fatal("missing or duplicate actions")
+				}
+			})
+		}
+	}
+}

@@ -28,6 +28,7 @@ ghprmerge close --org <organization> --source-branch <pattern> [flags]
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
+| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -52,7 +53,7 @@ These flags are placed after `close`.
 
 ## Behavior
 
-The close subcommand processes repositories sequentially and closes matching PRs. A PR is eligible when it is open, is not a draft, and targets its repository's default branch.
+The close subcommand processes repositories with `--workers` workers (default: one) and closes matching PRs. A PR is eligible when it is open, is not a draft, and targets its repository's default branch.
 
 Unlike `merge`, close eligibility does not depend on check status, merge conflicts, or whether the source branch is up to date. The command closes the PR without merging it.
 

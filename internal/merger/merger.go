@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/UnitVectorY-Labs/ghprmerge/internal/config"
@@ -20,6 +21,7 @@ type Merger struct {
 	console          *output.Console
 	scanDisplayLines int
 	lastMergeAttempt time.Time
+	mergeMu          sync.Mutex
 }
 
 // New creates a new Merger with the given client and configuration.
@@ -32,7 +34,7 @@ func New(client gh.Client, cfg *config.Config, console *output.Console) *Merger 
 }
 
 // Run executes the merger logic and returns the result.
-// Processing is strictly sequential: one repository at a time, one PR at a time.
+// Repositories use bounded workers; PRs within a repository remain sequential.
 func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 	m.scanDisplayLines = 0
 	startTime := time.Now()
@@ -82,53 +84,41 @@ func (m *Merger) Run(ctx context.Context) (*output.RunResult, error) {
 		}
 	}
 
-	repoCount := 0
 	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && len(repos) > 0
-
-	// Process each repository sequentially
-	for i, repo := range repos {
-		// Update progress bar
-		if showProgress {
-			m.console.ProgressBar(i+1, len(repos), "Scanning")
+	result.Repositories = make([]output.RepositoryResult, len(repos))
+	completed := 0
+	err = parallel(ctx, len(repos), m.config.Workers, m.config.RepoLimit, func(i int) output.RepositoryResult {
+		repo := repos[i]
+		if m.config.Confirm {
+			return m.processRepositoryScanOnly(ctx, repo)
 		}
-
-		// Check repo limit
-		var repoResult output.RepositoryResult
-		if m.config.RepoLimit > 0 && repoCount >= m.config.RepoLimit {
-			repoResult = output.RepositoryResult{
-				Name:          repo.Name,
-				FullName:      repo.FullName,
-				DefaultBranch: repo.DefaultBranch,
-				Skipped:       true,
-				SkipReason:    "repo limit reached",
-			}
-			result.Repositories = append(result.Repositories, repoResult)
+		return m.processRepository(ctx, repo)
+	}, func(i int, rr output.RepositoryResult, limited bool) bool {
+		if limited {
+			repo := repos[i]
+			rr = output.RepositoryResult{Name: repo.Name, FullName: repo.FullName, DefaultBranch: repo.DefaultBranch, Skipped: true, SkipReason: "repo limit reached"}
+		}
+		result.Repositories[i] = rr
+		completed++
+		if rr.Skipped {
 			result.Summary.ReposSkipped++
 		} else {
-			if m.config.Confirm {
-				repoResult = m.processRepositoryScanOnly(ctx, repo)
-			} else {
-				repoResult = m.processRepository(ctx, repo)
-			}
-			result.Repositories = append(result.Repositories, repoResult)
-
-			if repoResult.Skipped {
-				result.Summary.ReposSkipped++
-			} else {
-				result.Summary.ReposProcessed++
-				repoCount++
-			}
-
-			// Update summary with PR results
-			for _, pr := range repoResult.PullRequests {
-				result.Summary.CandidatesFound++
-				m.updateSummary(&result.Summary, pr)
-			}
+			result.Summary.ReposProcessed++
 		}
-
-		if showProgress && (m.shouldStreamScanResults() || hasCompletedActions(repoResult)) {
-			m.scanDisplayLines += m.printRepoResultWithProgress(repoResult, i+1, len(repos), "Scanning")
+		for _, pr := range rr.PullRequests {
+			result.Summary.CandidatesFound++
+			m.updateSummary(&result.Summary, pr)
 		}
+		if showProgress {
+			m.console.ProgressBar(completed, len(repos), "Scanning")
+		}
+		if m.console != nil && !m.config.JSON && (m.shouldStreamScanResults() || hasCompletedActions(rr)) {
+			m.scanDisplayLines += m.printRepoResultWithProgress(rr, completed, len(repos), "Scanning")
+		}
+		return !rr.Skipped
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Finish progress bar
@@ -192,47 +182,44 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	actionNum := 0
 	showProgress := m.console != nil && !m.config.JSON && !m.config.NoProgress && totalActions > 0
 
-	// Process each repository and execute pending actions
-	for i := range scanResult.Repositories {
+	err := parallel(ctx, len(scanResult.Repositories), m.config.Workers, 0, func(i int) int {
 		repo := &scanResult.Repositories[i]
 		if repo.Skipped {
-			continue
+			return 0
 		}
-
 		owner := strings.Split(repo.FullName, "/")[0]
-
+		count := 0
 		for j := range repo.PullRequests {
 			pr := &repo.PullRequests[j]
-
-			// Execute actions based on what was planned
 			switch pr.Action {
 			case output.ActionWouldRebase:
-				actionNum++
-				if showProgress {
-					m.console.ProgressBar(actionNum, totalActions, "Executing")
-				}
+				count++
 				m.executeRebase(ctx, owner, repo.Name, pr)
 			case output.ActionWouldMerge:
-				actionNum++
-				if showProgress {
-					m.console.ProgressBar(actionNum, totalActions, "Executing")
-				}
+				count++
 				m.executeMerge(ctx, owner, repo.Name, pr)
 			case output.ActionWouldClose:
-				actionNum++
-				if showProgress {
-					m.console.ProgressBar(actionNum, totalActions, "Executing")
-				}
+				count++
 				m.executeClose(ctx, owner, repo.Name, pr)
 			}
-
-			// Update summary
-			m.updateSummary(&scanResult.Summary, *pr)
 		}
-
-		if showProgress && hasCompletedActions(*repo) {
-			m.printRepoResultWithProgress(*repo, actionNum, totalActions, "Executing")
+		return count
+	}, func(i, count int, _ bool) bool {
+		repo := scanResult.Repositories[i]
+		actionNum += count
+		for _, pr := range repo.PullRequests {
+			m.updateSummary(&scanResult.Summary, pr)
 		}
+		if showProgress {
+			m.console.ProgressBar(actionNum, totalActions, "Executing")
+			if hasCompletedActions(repo) {
+				m.printRepoResultWithProgress(repo, actionNum, totalActions, "Executing")
+			}
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Finish progress bar
@@ -323,6 +310,11 @@ func (m *Merger) executeClose(ctx context.Context, owner, repoName string, pr *o
 // mergePullRequest waits only immediately before a merge request, so PR discovery
 // and readiness checks are never deliberately delayed by MinMergeDelay.
 func (m *Merger) mergePullRequest(ctx context.Context, owner, repoName string, number int) error {
+	if m.config.MinMergeDelay <= 0 {
+		return m.client.MergePullRequest(ctx, owner, repoName, number)
+	}
+	m.mergeMu.Lock()
+	defer m.mergeMu.Unlock()
 	if delay := time.Duration(m.config.MinMergeDelay) * time.Second; delay > 0 && !m.lastMergeAttempt.IsZero() {
 		if remaining := time.Until(m.lastMergeAttempt.Add(delay)); remaining > 0 {
 			timer := time.NewTimer(remaining)

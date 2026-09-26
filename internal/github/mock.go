@@ -3,10 +3,12 @@ package github
 
 import (
 	"context"
+	"sync"
 )
 
 // MockClient is a mock implementation of the Client interface for testing.
 type MockClient struct {
+	mu              sync.Mutex
 	Repositories    []Repository
 	PullRequests    map[string][]PullRequest // key: "owner/repo"
 	CheckStatuses   map[string]*CheckStatus  // key: "owner/repo/ref"
@@ -108,6 +110,8 @@ func (m *MockClient) GetBranchStatus(ctx context.Context, owner, repo string, pr
 
 // UpdateBranch mocks updating a branch.
 func (m *MockClient) UpdateBranch(ctx context.Context, owner, repo string, prNumber int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := owner + "/" + repo + "/" + string(rune(prNumber))
 	m.UpdateBranchCalls = append(m.UpdateBranchCalls, key)
 	if err, ok := m.UpdateBranchErr[key]; ok {
@@ -118,6 +122,8 @@ func (m *MockClient) UpdateBranch(ctx context.Context, owner, repo string, prNum
 
 // PostRebaseComment mocks posting a rebase comment.
 func (m *MockClient) PostRebaseComment(ctx context.Context, owner, repo string, prNumber int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := owner + "/" + repo + "/" + string(rune(prNumber))
 	m.PostRebaseCalls = append(m.PostRebaseCalls, key)
 	if err, ok := m.PostRebaseErr[key]; ok {
@@ -128,6 +134,8 @@ func (m *MockClient) PostRebaseComment(ctx context.Context, owner, repo string, 
 
 // MergePullRequest mocks merging a pull request.
 func (m *MockClient) MergePullRequest(ctx context.Context, owner, repo string, prNumber int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := owner + "/" + repo + "/" + string(rune(prNumber))
 	m.MergeCalls = append(m.MergeCalls, key)
 	if err, ok := m.MergeErr[key]; ok {
@@ -138,6 +146,8 @@ func (m *MockClient) MergePullRequest(ctx context.Context, owner, repo string, p
 
 // ClosePullRequest mocks closing a pull request.
 func (m *MockClient) ClosePullRequest(ctx context.Context, owner, repo string, prNumber int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := owner + "/" + repo + "/" + string(rune(prNumber))
 	m.CloseCalls = append(m.CloseCalls, key)
 	if err, ok := m.CloseErr[key]; ok {
@@ -148,6 +158,8 @@ func (m *MockClient) ClosePullRequest(ctx context.Context, owner, repo string, p
 
 // DeleteBranch mocks deleting a branch.
 func (m *MockClient) DeleteBranch(ctx context.Context, owner, repo, branch string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := owner + "/" + repo + "/" + branch
 	m.DeleteBranchCalls = append(m.DeleteBranchCalls, key)
 	if err, ok := m.DeleteBranchErr[key]; ok {

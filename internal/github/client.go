@@ -94,7 +94,8 @@ type Client interface {
 
 // RealClient implements the Client interface using the real GitHub API.
 type RealClient struct {
-	client *github.Client
+	client     *github.Client
+	httpClient *http.Client
 }
 
 // NewRealClient creates a new RealClient with the given token.
@@ -106,7 +107,8 @@ func NewRealClient(token string) *RealClient {
 	tc := oauth2.NewClient(ctx, ts)
 
 	return &RealClient{
-		client: github.NewClient(tc),
+		client:     github.NewClient(tc),
+		httpClient: tc,
 	}
 }
 
