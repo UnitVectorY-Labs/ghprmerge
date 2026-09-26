@@ -32,7 +32,7 @@ Use these to narrow the repositories or pull requests that a command considers.
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the selected organization. Repeat for multiple repositories, such as `--repo api --repo web`. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login, such as `dependabot[bot]`. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
-| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
+| `--workers <n>` | `GHPRMERGE_WORKERS` env or `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 
@@ -123,6 +123,7 @@ If you omit a subcommand and required command-specific flags, the error message 
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub personal access token (preferred) |
 | `GITHUB_ORG` | Default organization (can be overridden by `--org`) |
+| `GHPRMERGE_WORKERS` | Default worker count for all commands (positive integer; defaults to `1` when unset or empty; overridden by `--workers`) |
 | `GHPRMERGE_AUTHOR` | Default author filter (can be overridden by `--author`) |
 | `GHPRMERGE_MIN_GROUP_SIZE` | Default minimum group size for the `report` command (can be overridden by `--min-group-size`) |
 | `GHPRMERGE_MIN_MERGE_DELAY` | Default minimum delay in seconds between merge requests for `merge` (can be overridden by `--min-merge-delay`) |
@@ -272,7 +273,7 @@ Output will show: `Limit: 10 repositories max`
 
 ## Parallel workers and rate limits
 
-`--workers <n>` is available on `merge`, `rebase`, `close`, and `report`; the default is `1`, and zero or negative values are rejected. Repository discovery remains sequential. Repository scans, report status evaluation, and actions use up to the configured number of workers. PRs within a repository remain sequential. With `--confirm`, all scanning finishes before the prompt, and the action phase uses the same worker count.
+`--workers <n>` is available on `merge`, `rebase`, `close`, and `report`; the default is `1`. Set `GHPRMERGE_WORKERS` to a positive integer to change the default; `--workers` overrides that value. An unset or empty environment variable keeps the default of `1`. Invalid environment values are rejected during configuration, and worker counts below `1` are rejected. Repository discovery remains sequential. Repository scans, report status evaluation, and actions use up to the configured number of workers. PRs within a repository remain sequential. With `--confirm`, all scanning finishes before the prompt, and the action phase uses the same worker count.
 
 `--repo-limit` reserves slots for in-flight repositories so parallel actions cannot exceed the limit. Repository API failures release their slots. Final repository results retain discovery order; live repository blocks appear in completion order. A single coordinator owns console writes, progress counts, and summaries, preventing interleaved output. `--no-progress` suppresses the progress bar while retaining results; `--json` emits only the final structured result.
 

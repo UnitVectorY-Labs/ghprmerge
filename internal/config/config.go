@@ -256,6 +256,13 @@ func ParseFlags(args []string, version string) (*Config, error) {
 	var deleteSourceBranch bool
 
 	if command != CommandNone {
+		if value := os.Getenv("GHPRMERGE_WORKERS"); value != "" {
+			n, err := strconv.Atoi(value)
+			if err != nil || n < 1 {
+				return nil, fmt.Errorf("invalid GHPRMERGE_WORKERS value %q: must be a positive integer (1 or greater)", value)
+			}
+			workers = n
+		}
 		subFS := flag.NewFlagSet(string(command), flag.ContinueOnError)
 		subFS.Usage = func() {
 			printSubcommandUsage(subFS.Output(), command, subFS)
@@ -456,6 +463,7 @@ func printGlobalFlags(w io.Writer) {
 	fmt.Fprintln(w, "\nFiltering and execution flags:")
 	fmt.Fprintln(w, "  --author <login>           Only include pull requests opened by this GitHub login.")
 	fmt.Fprintln(w, "  --repo-limit <n>           Process at most n repositories (0 means unlimited).")
+	fmt.Fprintln(w, "  --workers <n>              Process repositories in parallel (default 1; must be at least 1; env GHPRMERGE_WORKERS).")
 	fmt.Fprintln(w, "\nOutput flags:")
 	fmt.Fprintln(w, "  --json                     Emit structured JSON instead of human-readable output.")
 	fmt.Fprintln(w, "  --no-color                 Disable ANSI color output.")
@@ -495,6 +503,7 @@ func printEnvironmentVariables(w io.Writer) {
 	fmt.Fprintln(w, "\nEnvironment variables:")
 	fmt.Fprintln(w, "  GITHUB_TOKEN               GitHub token. If unset, ghprmerge uses 'gh auth token'.")
 	fmt.Fprintln(w, "  GITHUB_ORG                 Default organization for --org.")
+	fmt.Fprintln(w, "  GHPRMERGE_WORKERS          Default --workers value for all commands (default 1; positive integer).")
 	fmt.Fprintln(w, "  GHPRMERGE_AUTHOR           Default GitHub login for --author.")
 	fmt.Fprintln(w, "  GHPRMERGE_MIN_GROUP_SIZE   Default --min-group-size value for report.")
 	fmt.Fprintln(w, "  GHPRMERGE_MIN_MERGE_DELAY  Default --min-merge-delay value for merge (seconds).")

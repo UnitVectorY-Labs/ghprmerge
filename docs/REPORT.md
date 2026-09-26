@@ -30,7 +30,7 @@ The report subcommand discovers repositories using the same logic as the `merge`
 | `--repo <repository>` | - | Limit scanning to an exact repository name in the organization; may be repeated. |
 | `--author <login>` | `GHPRMERGE_AUTHOR` env | Include only PRs opened by this GitHub login. |
 | `--repo-limit <n>` | `0` | Process at most `n` repositories; `0` means unlimited. |
-| `--workers <n>` | `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
+| `--workers <n>` | `GHPRMERGE_WORKERS` env or `1` | Maximum concurrent repository workers; must be at least `1`. Available on all subcommands. |
 
 ## Output Controls
 

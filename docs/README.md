@@ -33,7 +33,7 @@ ghprmerge is designed to be **safe by default**:
    - All commit status contexts are successful, or no statuses are configured at all
    - No merge conflicts
    - Branch is fully up to date with the default branch (unless `--skip-rebase` is used with `merge`)
-4. **Repository workers** - `--workers <n>` controls concurrent repository processing (default: `1`). A single coordinator serializes output and progress updates.
+4. **Repository workers** - `--workers <n>` controls concurrent repository processing (default: `GHPRMERGE_WORKERS` or `1`; the flag overrides the environment). A single coordinator serializes output and progress updates.
 5. **No local checkout** - All operations use the GitHub API
 
 ## Non-Goals
