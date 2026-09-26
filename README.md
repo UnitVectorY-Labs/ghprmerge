@@ -89,10 +89,11 @@ MIT License - see [LICENSE](LICENSE) for details.
 Use four repository workers to speed up scans and independent actions:
 
 ```bash
+GHPRMERGE_WORKERS=4 ghprmerge report --org myorg
 ghprmerge report --org myorg --workers 4
 ghprmerge merge --org myorg --source-branch dependabot/ --workers 4 --min-merge-delay 2 --confirm
 ghprmerge rebase --org myorg --source-branch dependabot/ --workers 4
 ghprmerge close --org myorg --source-branch obsolete/ --workers 4 --confirm
 ```
 
-The default is one worker. PRs within each repository stay sequential. Start with a modest worker count: higher concurrency can reach GitHub rate limits sooner. Workers share rate-limit cooldowns and bounded retries. `--min-merge-delay` spaces merge requests across all workers.
+The default is one worker. Set `GHPRMERGE_WORKERS` to a positive integer to change the default for all commands; an explicit `--workers` flag overrides it. PRs within each repository stay sequential. Start with a modest worker count: higher concurrency can reach GitHub rate limits sooner. Workers share rate-limit cooldowns and bounded retries. `--min-merge-delay` spaces merge requests across all workers.

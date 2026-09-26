@@ -21,6 +21,8 @@ func TestRootHelpDocumentsCommandsFlagsAndEnvironment(t *testing.T) {
 		"--org <organization>",
 		"--repo <repository>",
 		"Filtering and execution flags:",
+		"--workers <n>",
+		"GHPRMERGE_WORKERS",
 		"Output flags:",
 		"Environment variables:",
 		"GITHUB_TOKEN",
@@ -55,6 +57,7 @@ func TestSubcommandHelpDocumentsBehaviorGlobalAndCommandFlags(t *testing.T) {
 				"--confirm",
 			},
 		},
+		{command: CommandClose, expected: []string{"closes matching pull requests", "--delete-source-branch"}},
 		{
 			command: CommandReport,
 			expected: []string{
@@ -74,6 +77,8 @@ func TestSubcommandHelpDocumentsBehaviorGlobalAndCommandFlags(t *testing.T) {
 				"--org <organization>",
 				"--repo <repository>",
 				"--author <login>",
+				"--workers <n>",
+				"GHPRMERGE_WORKERS",
 				"--json",
 				"GITHUB_TOKEN",
 			) {
@@ -971,6 +976,8 @@ func TestBuildVersionOutputNoVPrefixForDev(t *testing.T) {
 }
 
 func TestWorkers(t *testing.T) {
+	t.Setenv("GHPRMERGE_WORKERS", "")
+	t.Setenv("GITHUB_TOKEN", "test-token")
 	for _, command := range []string{"merge", "rebase", "close", "report"} {
 		for _, value := range []string{"1", "4", "0", "-2", "bad"} {
 			cfg, err := ParseFlags([]string{command, "--workers", value}, "test")
@@ -985,6 +992,51 @@ func TestWorkers(t *testing.T) {
 		cfg, err := ParseFlags([]string{command}, "test")
 		if err != nil || cfg.Workers != 1 {
 			t.Fatalf("default %s: %v", command, err)
+		}
+	}
+}
+
+func TestWorkersEnvironment(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	for _, command := range []string{"merge", "rebase", "close", "report"} {
+		for _, tt := range []struct {
+			name string
+			env  string
+			flag string
+			want int
+		}{
+			{name: "empty", want: 1},
+			{name: "one", env: "1", want: 1},
+			{name: "multiple", env: "4", want: 4},
+			{name: "override", env: "4", flag: "2", want: 2},
+			{name: "override with default", env: "4", flag: "1", want: 1},
+			{name: "zero", env: "0"},
+			{name: "negative", env: "-2"},
+			{name: "text", env: "bad"},
+			{name: "fraction", env: "1.5"},
+			{name: "trailing text", env: "4 extra"},
+			{name: "overflow", env: "999999999999999999999999"},
+		} {
+			t.Run(command+"/"+tt.name, func(t *testing.T) {
+				t.Setenv("GHPRMERGE_WORKERS", tt.env)
+				args := []string{command}
+				if tt.flag != "" {
+					args = append(args, "--workers", tt.flag)
+				}
+				cfg, err := ParseFlags(args, "test")
+				if tt.want == 0 {
+					if err == nil || !contains(err.Error(), "GHPRMERGE_WORKERS") {
+						t.Fatalf("expected GHPRMERGE_WORKERS error, got %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if cfg.Workers != tt.want {
+					t.Fatalf("Workers = %d, want %d", cfg.Workers, tt.want)
+				}
+			})
 		}
 	}
 }
