@@ -185,7 +185,7 @@ Match PRs from multiple source branch patterns in a single pass:
 ghprmerge merge --org myorg --source-branch dependabot/ --source-branch repver/
 ```
 
-Specifying multiple `--source-branch` flags scans all repositories once and matches PRs against each pattern. This reduces the number of scanning passes compared to running separate commands for each pattern. When multiple patterns match PRs in the same repository, the first matching pattern per repository takes priority for concurrent PR handling.
+Specifying multiple `--source-branch` flags scans all repositories once and matches PRs against each pattern. This reduces the number of scanning passes compared to running separate commands for each pattern. Rebase processes every eligible match sequentially within each repository. Merge and close select the first supplied pattern with eligible matches and explicitly report matches from other patterns as skipped.
 
 Multiple source branches also work with the `rebase` subcommand:
 
@@ -389,3 +389,22 @@ ghprmerge close --org myorg --source-branch obsolete/ --workers 4 --confirm
 ```
 
 The default is one worker. Set `GHPRMERGE_WORKERS` to a positive integer to change the default for all commands; an explicit `--workers` flag overrides it. PRs within each repository stay sequential. Start with a modest worker count: higher concurrency can reach GitHub rate limits sooner. Workers share rate-limit cooldowns and bounded retries. `--min-merge-delay` spaces merge requests across all workers.
+
+### Distinguish branch freshness from check failures
+
+```bash
+ghprmerge report --author 'dependabot[bot]' --min-group-size 1
+# Example: repo-a #123 checks failing; 6 commits behind
+# Example: repo-b #124 checks failing; up to date
+
+ghprmerge rebase --source-branch dependabot/maven/ --source-branch dependabot/docker/
+# Behind branches: rebase requested — posted @dependabot rebase comment
+# Up-to-date branches: no rebase needed — checks failing, branch up to date
+# Summary: 7 rebase requests submitted | 3 already up to date
+```
+
+A rebase request does not verify completion. Wait for branch updates and passing checks before running merge. To find failing PRs that are also behind in report JSON:
+
+```bash
+ghprmerge report --json --min-group-size 1 | jq '.groups[].pullRequests[] | select(.checks == "checks failing" and .branchStatus == "needs-rebase")'
+```

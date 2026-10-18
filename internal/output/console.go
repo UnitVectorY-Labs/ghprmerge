@@ -275,7 +275,7 @@ func (c *Console) PrintSummary(summary RunSummary) {
 		parts = append(parts, c.Green(fmt.Sprintf("%d merged", summary.MergedSuccess)))
 	}
 	if summary.RebasedSuccess > 0 {
-		parts = append(parts, c.Yellow(fmt.Sprintf("%d rebased", summary.RebasedSuccess)))
+		parts = append(parts, c.Yellow(fmt.Sprintf("%d rebase requests submitted", summary.RebasedSuccess)))
 	}
 	if summary.ClosedSuccess > 0 {
 		parts = append(parts, c.Yellow(fmt.Sprintf("%d closed", summary.ClosedSuccess)))
@@ -288,6 +288,9 @@ func (c *Console) PrintSummary(summary RunSummary) {
 	}
 	if summary.WouldClose > 0 {
 		parts = append(parts, c.Yellow(fmt.Sprintf("%d would close", summary.WouldClose)))
+	}
+	if summary.AlreadyUpToDate > 0 {
+		parts = append(parts, c.Dim(fmt.Sprintf("%d already up to date", summary.AlreadyUpToDate)))
 	}
 	if summary.ReadyToMerge > 0 {
 		parts = append(parts, c.Green(fmt.Sprintf("%d ready to merge", summary.ReadyToMerge)))

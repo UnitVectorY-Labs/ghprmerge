@@ -17,10 +17,12 @@ const (
 	ActionWouldClose  Action = "would close"
 	ActionReadyMerge  Action = "ready to merge" // Ready but merge not enabled
 
+	ActionNoRebaseNeeded Action = "no rebase needed"
+
 	// Execution mode actions (what happened)
 	ActionMerged       Action = "merged"
 	ActionMergeFailed  Action = "merge failed"
-	ActionRebased      Action = "rebased"
+	ActionRebased      Action = "rebase requested"
 	ActionRebaseFailed Action = "rebase failed"
 	ActionClosed       Action = "closed"
 	ActionCloseFailed  Action = "close failed"
@@ -37,6 +39,7 @@ const (
 	ActionSkipAwaitingChecks      Action = "skip: branch updated, awaiting checks"
 	ActionSkipPermissions         Action = "skip: insufficient permissions"
 	ActionSkipAPIError            Action = "skip: API error"
+	ActionSkipOtherPattern        Action = "skip: another source pattern selected"
 	ActionSkipRepoLimit           Action = "skip: repo limit reached"
 )
 
@@ -55,6 +58,7 @@ const (
 	ReasonAwaitingChecks      SkipReason = "branch updated, awaiting checks"
 	ReasonPermissions         SkipReason = "insufficient permissions"
 	ReasonAPIError            SkipReason = "API error"
+	ReasonOtherPattern        SkipReason = "another source pattern selected"
 	ReasonRepoLimit           SkipReason = "repo limit reached"
 )
 
@@ -109,13 +113,14 @@ type RunSummary struct {
 	CandidatesFound int            `json:"candidates_found"`
 	MergedSuccess   int            `json:"merged_success"`
 	MergeFailed     int            `json:"merge_failed"`
-	RebasedSuccess  int            `json:"rebased_success"`
+	RebasedSuccess  int            `json:"rebased_success"` // Legacy field: successful requests, not verified completion.
 	RebaseFailed    int            `json:"rebase_failed"`
 	ClosedSuccess   int            `json:"closed_success"`
 	CloseFailed     int            `json:"close_failed"`
 	WouldMerge      int            `json:"would_merge,omitempty"`
 	WouldRebase     int            `json:"would_rebase,omitempty"`
 	WouldClose      int            `json:"would_close,omitempty"`
+	AlreadyUpToDate int            `json:"already_up_to_date,omitempty"`
 	ReadyToMerge    int            `json:"ready_to_merge,omitempty"`
 	Skipped         int            `json:"skipped"`
 	SkippedByReason map[string]int `json:"skipped_by_reason,omitempty"`

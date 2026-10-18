@@ -64,7 +64,7 @@ The report subcommand processes repositories with `--workers` workers (default: 
 4. **Filter by prefix**: If `--source-branch-prefix` is set, only groups whose branch name starts with one of the specified prefixes are included.
 5. **Filter by group size**: Groups with fewer PRs than `--min-group-size` (default: 2) are excluded.
 6. **Sort**: Groups are sorted by descending PR count. Ties are broken by ascending branch name.
-7. **Evaluate status**: Each PR's status is evaluated using the same logic as the `merge` and `rebase` subcommands (check status, branch status relative to default branch).
+7. **Evaluate status**: Each PR is evaluated for both check status and branch status relative to the default branch, even when checks fail or are pending.
 
 **No mutations are performed.** The report subcommand is entirely read-only. It never merges, rebases, or comments on pull requests.
 
@@ -87,13 +87,13 @@ Displays the branch name, count, and for each PR: the repository name, PR number
 
 ```
 dependabot/go_modules/foo-1.2.3 (3 PRs)
-  repo-a     #123  passing
-  repo-b     #456  needs-rebase
-  repo-c     #789  checks pending
+  repo-a     #123  all checks passing; up to date
+  repo-b     #456  all checks passing; 6 commits behind
+  repo-c     #789  checks pending; up to date
 
 dependabot/npm_and_yarn/bar-2.0.0 (2 PRs)
-  repo-a     #124  passing
-  repo-d     #321  conflict
+  repo-a     #124  all checks passing; up to date
+  repo-d     #321  all checks passing; conflict
 ```
 
 ### `verbose`
@@ -102,13 +102,13 @@ Includes everything from `standard` plus the PR title:
 
 ```
 dependabot/go_modules/foo-1.2.3 (3 PRs)
-  repo-a     #123  passing         Bump foo from 1.2.2 to 1.2.3
-  repo-b     #456  needs-rebase    Bump foo from 1.2.2 to 1.2.3
-  repo-c     #789  checks pending  Bump foo from 1.2.2 to 1.2.3
+  repo-a     #123 Bump foo from 1.2.2 to 1.2.3 all checks passing; up to date
+  repo-b     #456 Bump foo from 1.2.2 to 1.2.3 all checks passing; 6 commits behind
+  repo-c     #789 Bump foo from 1.2.2 to 1.2.3 checks pending; up to date
 
 dependabot/npm_and_yarn/bar-2.0.0 (2 PRs)
-  repo-a     #124  passing         Bump bar from 1.9.0 to 2.0.0
-  repo-d     #321  conflict        Bump bar from 1.9.0 to 2.0.0
+  repo-a     #124 Bump bar from 1.9.0 to 2.0.0 all checks passing; up to date
+  repo-d     #321 Bump bar from 1.9.0 to 2.0.0 all checks passing; conflict
 ```
 
 The `--verbosity` flag only affects text output. JSON output always includes all fields regardless of the verbosity setting.
@@ -128,6 +128,9 @@ With `--json`, the report subcommand outputs structured JSON. The schema is the 
           "repository": "repo-a",
           "number": 123,
           "status": "passing",
+          "checks": "all checks passing",
+          "branchStatus": "up to date",
+          "behindBy": 0,
           "title": "Bump foo from 1.2.2 to 1.2.3",
           "url": "https://github.com/myorg/repo-a/pull/123"
         },
@@ -135,6 +138,9 @@ With `--json`, the report subcommand outputs structured JSON. The schema is the 
           "repository": "repo-b",
           "number": 456,
           "status": "needs-rebase",
+          "checks": "all checks passing",
+          "branchStatus": "needs-rebase",
+          "behindBy": 6,
           "title": "Bump foo from 1.2.2 to 1.2.3",
           "url": "https://github.com/myorg/repo-b/pull/456"
         },
@@ -142,6 +148,9 @@ With `--json`, the report subcommand outputs structured JSON. The schema is the 
           "repository": "repo-c",
           "number": 789,
           "status": "checks pending",
+          "checks": "checks pending",
+          "branchStatus": "up to date",
+          "behindBy": 0,
           "title": "Bump foo from 1.2.2 to 1.2.3",
           "url": "https://github.com/myorg/repo-c/pull/789"
         }
@@ -165,13 +174,16 @@ Each pull request contains:
 |-------|------|-------------|
 | `repository` | string | The repository name (without the organization prefix) |
 | `number` | number | The pull request number |
-| `status` | string | The evaluated status of the PR (see [Status Values](#status-values)) |
+| `status` | string | The primary evaluated status (see [Status Values](#status-values)) |
+| `checks` | string | `all checks passing`, `checks failing`, `checks pending`, `no checks configured`, or `error` |
+| `branchStatus` | string | `up to date`, `needs-rebase`, `conflict`, or `error` |
+| `behindBy` | number | Commits behind the base; only meaningful when `branchStatus` is not `error` |
 | `title` | string | The pull request title |
 | `url` | string | The full URL to the pull request on GitHub |
 
 ## Status Values
 
-Each PR is assigned one of the following status values, using the same evaluation logic as the `merge` and `rebase` subcommands:
+Each PR retains a primary `status` for compatibility. Failed or pending checks take precedence; otherwise conflicts and behind branches take precedence over passing/no-checks status. Independent fields expose simultaneous conditions:
 
 | Status | Description |
 |--------|-------------|

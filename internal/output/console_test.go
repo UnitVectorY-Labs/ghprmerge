@@ -195,8 +195,8 @@ func TestConsolePrintSummary(t *testing.T) {
 	if !strings.Contains(output, "2 merged") {
 		t.Errorf("Expected '2 merged' in summary, got: %q", output)
 	}
-	if !strings.Contains(output, "1 rebased") {
-		t.Errorf("Expected '1 rebased' in summary, got: %q", output)
+	if !strings.Contains(output, "1 rebase requests submitted") {
+		t.Errorf("Expected '1 rebase requests submitted' in summary, got: %q", output)
 	}
 	if !strings.Contains(output, "2 skipped") {
 		t.Errorf("Expected '2 skipped' in summary, got: %q", output)

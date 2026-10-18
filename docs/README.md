@@ -130,3 +130,11 @@ scan → collect open PRs → group by branch name → filter → sort → displ
 - [REPORT.md](REPORT.md) - Report subcommand details
 - [EXAMPLES.md](EXAMPLES.md) - Practical example commands and workflows
 - [INSTALL.md](INSTALL.md) - Installation instructions
+
+### Independent status and rebase outcomes
+
+Report evaluates checks and branch freshness independently, including branch comparisons when checks fail or are pending. Text displays both conditions; JSON adds `checks`, `branchStatus`, and `behindBy` alongside the existing primary `status`.
+
+Rebase updates all eligible PRs matching any source pattern, sequentially within a repository. Up-to-date branches are reported as `no rebase needed`, preserving actual check status. Successful submissions are `rebase requested`; completion is not verified. The summary distinguishes requests submitted from branches already up to date. The same classification applies during confirmation scans and execution.
+
+Merge and close choose the first supplied pattern that matches an eligible PR after author filtering. Other matching PRs remain visible as explicit skips and are included in candidate counts.

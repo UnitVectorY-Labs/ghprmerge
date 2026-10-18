@@ -1669,8 +1669,7 @@ func TestMergerMultipleSourceBranches(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	// repo-a should only have the dependabot PR (first matching pattern wins;
-	// "repver/" is silently skipped because "dependabot/" matched first)
+	// repo-a includes the selected PR and an explicit exclusion for repver/.
 	var repoA, repoB, repoC *output.RepositoryResult
 	for i := range result.Repositories {
 		switch result.Repositories[i].Name {
@@ -1686,8 +1685,8 @@ func TestMergerMultipleSourceBranches(t *testing.T) {
 	if repoA == nil {
 		t.Fatal("repo-a not found in results")
 	}
-	if len(repoA.PullRequests) != 1 {
-		t.Fatalf("repo-a: expected 1 PR (first pattern only), got %d", len(repoA.PullRequests))
+	if len(repoA.PullRequests) != 2 {
+		t.Fatalf("repo-a: expected 2 PRs including the excluded pattern, got %d", len(repoA.PullRequests))
 	}
 	if repoA.PullRequests[0].HeadBranch != "dependabot/npm/lodash" {
 		t.Errorf("repo-a: expected PR from dependabot/ pattern, got head branch %q", repoA.PullRequests[0].HeadBranch)
@@ -1715,10 +1714,9 @@ func TestMergerMultipleSourceBranches(t *testing.T) {
 		t.Errorf("repo-c: expected repver PR, got head branch %q", repoC.PullRequests[0].HeadBranch)
 	}
 
-	// Total candidates: 3 (repo-a gets 1, repo-b gets 1, repo-c gets 1)
-	// repo-a's repver PR is filtered out by discoverPullRequests
-	if result.Summary.CandidatesFound != 3 {
-		t.Errorf("CandidatesFound = %d, want 3", result.Summary.CandidatesFound)
+	// All eligible matches are counted, including exclusions.
+	if result.Summary.CandidatesFound != 4 {
+		t.Errorf("CandidatesFound = %d, want 4", result.Summary.CandidatesFound)
 	}
 
 	// All 3 should be merged
@@ -1779,15 +1777,14 @@ func TestMergerMultipleSourceBranchesConcurrentSkip(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	// Only the PR matching "pattern-a/" should be discovered; "pattern-b/" is
-	// silently skipped because a different pattern already matched this repo.
+	// The other matching pattern remains visible as an explicit exclusion.
 	if len(result.Repositories) != 1 {
 		t.Fatalf("Expected 1 repository, got %d", len(result.Repositories))
 	}
 
 	repo := result.Repositories[0]
-	if len(repo.PullRequests) != 1 {
-		t.Fatalf("Expected 1 PR (pattern-a/ only), got %d", len(repo.PullRequests))
+	if len(repo.PullRequests) != 2 {
+		t.Fatalf("Expected 2 PRs including exclusion, got %d", len(repo.PullRequests))
 	}
 	if repo.PullRequests[0].HeadBranch != "pattern-a/update-1" {
 		t.Errorf("Expected PR from pattern-a/, got head branch %q", repo.PullRequests[0].HeadBranch)
@@ -1796,9 +1793,11 @@ func TestMergerMultipleSourceBranchesConcurrentSkip(t *testing.T) {
 		t.Errorf("Expected PR #1, got #%d", repo.PullRequests[0].Number)
 	}
 
-	// The pattern-b/ PR should not appear in results at all
-	if result.Summary.CandidatesFound != 1 {
-		t.Errorf("CandidatesFound = %d, want 1 (pattern-b/ PR should be filtered out)", result.Summary.CandidatesFound)
+	if repo.PullRequests[1].Action != output.ActionSkipOtherPattern || result.Summary.Skipped != 1 {
+		t.Fatalf("expected explicit pattern exclusion: %+v", result)
+	}
+	if result.Summary.CandidatesFound != 2 {
+		t.Fatalf("expected both matches: %+v", result.Summary)
 	}
 
 	if result.Summary.MergedSuccess != 1 {

@@ -58,7 +58,7 @@ The rebase subcommand processes repositories with `--workers` workers (default: 
 
 Key behavioral properties:
 
-- **Out-of-date branches only**: Branches that are already up-to-date with the default branch are skipped.
+- **Out-of-date branches only**: Branches that are already up-to-date are reported as `no rebase needed`, with their observed check status. They are counted as `already up to date`, never as ready to merge.
 - **Not a draft**: Draft PRs are excluded.
 - **Targets default branch**: Only PRs targeting the repository's default branch are considered.
 - **No merging**: The rebase subcommand never merges a PR. Rebase and merge are intentionally separate operations to provide explicit control over each step.
@@ -97,6 +97,8 @@ For branches that do not have the `dependabot/` prefix, the tool uses GitHub's u
 ghprmerge rebase --org myorg --source-branch feature/batch-update
 ```
 
+Successful submissions are labeled `rebase requested`, and the summary counts `rebase requests submitted`. Posting a Dependabot comment or requesting an API update does not verify completion. Wait for the branch update and checks before running merge. For JSON compatibility, `rebased_success` remains the field name for successful request submissions; it does not count verified completed rebases. The action value changes from `rebased` to `rebase requested`. The new `already_up_to_date` summary field counts PRs needing no rebase.
+
 ## Confirmation Mode
 
 The `--confirm` flag changes the execution flow to a two-phase process:
@@ -133,21 +135,20 @@ ghprmerge rebase --org myorg --source-branch dependabot/npm_and_yarn/ --source-b
 ### Matching behavior
 
 - Multiple `--source-branch` patterns are matched during a single scan of each repository, reducing the number of passes required.
-- If multiple source branch patterns match PRs in the **same repository**, only the first matching pattern (by the order specified on the command line) is used. Subsequent matches in that repository are skipped.
-- This prevents concurrent modification issues where rebasing one PR could invalidate the branch state of another PR in the same repository.
+- All eligible PRs matching any supplied pattern are processed, including different patterns in the same repository. PRs within each repository are processed sequentially; each PR is processed once even if multiple patterns match.
 
 ### Pattern ordering
 
-The order of `--source-branch` flags matters. Place higher-priority patterns first:
+All matching patterns are considered regardless of flag order:
 
 ```bash
-# Prioritize Go module updates over npm updates
+# Include both Go module updates and npm updates
 ghprmerge rebase --org myorg \
   --source-branch dependabot/go_modules/ \
   --source-branch dependabot/npm_and_yarn/
 ```
 
-In this example, if a repository has both a Go module update PR and an npm update PR, only the Go module PR will be considered for rebasing.
+In this example, both Go module and npm PRs in a repository are considered for rebasing. Flag order does not set execution priority.
 
 ## Examples
 
