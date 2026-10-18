@@ -10,11 +10,14 @@ import (
 
 // ReportPullRequest represents a single PR in a report group.
 type ReportPullRequest struct {
-	Repository string `json:"repository"`
-	Number     int    `json:"number"`
-	Status     string `json:"status"`
-	Title      string `json:"title,omitempty"`
-	URL        string `json:"url,omitempty"`
+	Checks       string `json:"checks,omitempty"`
+	BranchStatus string `json:"branchStatus,omitempty"`
+	BehindBy     int    `json:"behindBy"`
+	Repository   string `json:"repository"`
+	Number       int    `json:"number"`
+	Status       string `json:"status"`
+	Title        string `json:"title,omitempty"`
+	URL          string `json:"url,omitempty"`
 }
 
 // ReportGroup represents a group of PRs sharing the same source branch.
@@ -90,7 +93,15 @@ func (c *Console) printReportGroup(group ReportGroup, verbosity string) {
 		if verbosity == "verbose" && pr.Title != "" {
 			line += " " + truncateString(pr.Title, 50)
 		}
-		line += " " + c.reportStatusColor(pr.Status, pr.Status)
+		if pr.BranchStatus == "" {
+			line += " " + c.reportStatusColor(pr.Status, pr.Status)
+		} else {
+			branch := pr.BranchStatus
+			if branch == "needs-rebase" {
+				branch = fmt.Sprintf("%d commits behind", pr.BehindBy)
+			}
+			line += " " + c.reportStatusColor(pr.Checks, pr.Checks) + "; " + c.reportStatusColor(branch, pr.BranchStatus)
+		}
 		fmt.Fprintln(c.w, line)
 	}
 }

@@ -222,49 +222,42 @@ func (m *Merger) buildReportPR(ctx context.Context, repoName string, pr gh.PullR
 		owner = m.config.Org
 	}
 
-	rpr.Status = m.evaluateReportStatus(ctx, owner, repoName, pr)
+	m.assessReportPR(ctx, owner, repoName, pr, &rpr)
 	return rpr
 }
 
-// evaluateReportStatus evaluates the status of a PR for report mode.
-// It reuses the same assessment logic as ghprmerge's normal evaluation.
-func (m *Merger) evaluateReportStatus(ctx context.Context, owner, repoName string, pr gh.PullRequest) string {
-	// Get check status
-	checkStatus, err := m.client.GetCheckStatus(ctx, owner, repoName, pr.HeadSHA)
-	if err != nil {
-		return "error"
+// assessReportPR evaluates checks and branch freshness independently.
+func (m *Merger) assessReportPR(ctx context.Context, owner, repoName string, pr gh.PullRequest, result *output.ReportPullRequest) {
+	checkStatus, checkErr := m.client.GetCheckStatus(ctx, owner, repoName, pr.HeadSHA)
+	branch, branchErr := m.client.GetBranchStatus(ctx, owner, repoName, pr.Number)
+	result.Checks = "error"
+	result.BranchStatus = "error"
+	if checkErr == nil {
+		result.Checks = describeChecks(checkStatus)
 	}
-
-	if checkStatus.NoChecks {
-		// No checks configured - check branch status
-		return m.evaluateReportBranchStatus(ctx, owner, repoName, pr, "no checks configured")
+	if branchErr == nil {
+		result.BehindBy = branch.BehindBy
+		result.BranchStatus = "up to date"
+		if !branch.UpToDate {
+			result.BranchStatus = "needs-rebase"
+		}
+		if branch.HasConflict {
+			result.BranchStatus = "conflict"
+		}
 	}
-
-	if checkStatus.Pending {
-		return "checks pending"
+	result.Status = result.Checks
+	if checkErr != nil || branchErr != nil {
+		result.Status = "error"
+		return
 	}
-
-	if !checkStatus.AllPassing {
-		return "checks failing"
+	if checkStatus.Pending || (!checkStatus.AllPassing && !checkStatus.NoChecks) {
+		return
 	}
-
-	return m.evaluateReportBranchStatus(ctx, owner, repoName, pr, "passing")
-}
-
-// evaluateReportBranchStatus evaluates branch status for report mode.
-func (m *Merger) evaluateReportBranchStatus(ctx context.Context, owner, repoName string, pr gh.PullRequest, checksState string) string {
-	branchStatus, err := m.client.GetBranchStatus(ctx, owner, repoName, pr.Number)
-	if err != nil {
-		return "error"
+	if result.BranchStatus != "up to date" {
+		result.Status = result.BranchStatus
+		return
 	}
-
-	if branchStatus.HasConflict {
-		return "conflict"
+	if checkStatus.AllPassing && !checkStatus.NoChecks {
+		result.Status = "passing"
 	}
-
-	if !branchStatus.UpToDate {
-		return "needs-rebase"
-	}
-
-	return checksState
 }

@@ -119,7 +119,7 @@ ghprmerge merge --org myorg --source-branch dependabot/npm_and_yarn/ --source-br
 ### Matching behavior
 
 - Multiple `--source-branch` patterns are matched during a single scan of each repository, reducing the number of passes required.
-- If multiple source branch patterns match PRs in the **same repository**, only the first matching pattern (by the order specified on the command line) is used. Subsequent matches in that repository are skipped.
+- If multiple source branch patterns match PRs in the **same repository**, only the first matching pattern (by the order specified on the command line) is used. Subsequent matches in that repository appear as `skip: another source pattern selected` and count toward PRs found and skipped. Selection uses eligible PRs after author filtering.
 - This prevents concurrent modification issues where merging one PR could invalidate the branch state of another PR in the same repository.
 
 ### Pattern ordering

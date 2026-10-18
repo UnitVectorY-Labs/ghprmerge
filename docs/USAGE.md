@@ -192,7 +192,7 @@ Mode: merge mode │ Branch: dependabot/ │ Author: dependabot[bot]
 ```
 
 - `✓` merged (green)
-- `↻` rebased (yellow)
+- `↻` rebase requested (yellow)
 - `↻` closed (yellow)
 - `✗` failed (red)
 - `⊘` skipped (dim)
@@ -219,7 +219,7 @@ With `--verbose` (merge, rebase, and close only), repository results are emitted
 A condensed summary line is printed at the end:
 ```
 ────────────────────────────────────────────────────
-100 repos scanned │ 3 PRs found │ 1 merged │ 1 rebased │ 1 skipped
+100 repos scanned │ 3 PRs found │ 1 merged │ 1 rebase requests submitted │ 1 skipped
 ```
 
 Use `--no-color` to disable ANSI color codes (useful for piping output or CI environments).
@@ -280,3 +280,13 @@ Output will show: `Limit: 10 repositories max`
 All workers share a cooldown when GitHub reports a primary or secondary rate limit. Primary limits wait until the reset time (plus one second); secondary limits honor `Retry-After`, or back off for 60, 120, then 240 seconds when no delay is supplied. A request gets at most three retries; exhausted retries follow the usual API-error reporting behavior. Waits respect context cancellation. Ordinary permission errors and ambiguous network/mutation failures are not retried. Requests already in flight may finish during a cooldown.
 
 Higher worker counts do not increase your GitHub quota. Start with a modest count such as `4`. For merges, `--min-merge-delay` remains a global interval across workers; scans and checks can proceed during that delay. See [GitHub rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
+
+### Rebase and report status
+
+Rebase ignores failed or pending checks when deciding whether to update a behind branch. An up-to-date branch is labeled `no rebase needed`, with its actual check status; the summary counts `already up to date`. Rebase never reports these PRs as ready to merge. `rebase requested` and `rebase requests submitted` mean a comment/API request succeeded, without verifying completion.
+
+Rebase processes all eligible matches across all source patterns, sequentially within each repository. Merge and close select the first supplied pattern that matches an eligible PR in each repository; other matches appear as `skip: another source pattern selected`. These excluded matches count toward PRs found and skipped. Author filtering occurs before pattern selection.
+
+Report shows check state and branch freshness independently, for example `checks failing; 6 commits behind`. Report JSON retains `status` and adds `checks`, `branchStatus`, and `behindBy`. Branch status can be `up to date`, `needs-rebase`, `conflict`, or `error`. Checks can be `all checks passing`, `checks failing`, `checks pending`, `no checks configured`, or `error`.
+
+Run JSON changes the successful rebase action from `rebased` to `rebase requested` and adds `already_up_to_date` to the summary. The legacy `rebased_success` field continues to count successful request submissions, not completed rebases. No CLI flags change.

@@ -90,7 +90,7 @@ ghprmerge close --org myorg \
   --source-branch feature/abandoned/
 ```
 
-If multiple patterns match PRs in the same repository, the first matching pattern specified on the command line takes priority.
+If multiple patterns match PRs in the same repository, the first supplied pattern with eligible matches after author filtering takes priority. Other matches appear as `skip: another source pattern selected` and count toward PRs found and skipped.
 
 ## Examples
 

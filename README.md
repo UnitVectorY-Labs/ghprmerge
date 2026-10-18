@@ -97,3 +97,12 @@ ghprmerge close --org myorg --source-branch obsolete/ --workers 4 --confirm
 ```
 
 The default is one worker. Set `GHPRMERGE_WORKERS` to a positive integer to change the default for all commands; an explicit `--workers` flag overrides it. PRs within each repository stay sequential. Start with a modest worker count: higher concurrency can reach GitHub rate limits sooner. Workers share rate-limit cooldowns and bounded retries. `--min-merge-delay` spaces merge requests across all workers.
+
+### Read rebase results
+
+```bash
+ghprmerge report --author 'dependabot[bot]' --min-group-size 1
+ghprmerge rebase --source-branch dependabot/maven/ --source-branch dependabot/docker/
+```
+
+Report shows checks and branch freshness together, such as `checks failing; 6 commits behind`. Rebase processes all eligible matching PRs, including multiple patterns in the same repository. `rebase requested` means the comment/API request was submitted; completion is not verified. `no rebase needed` means the branch is already up to date, and may still have failing checks. Wait for branch updates and passing checks before running `merge`.

@@ -166,6 +166,8 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 	scanResult.Summary.WouldMerge = 0
 	scanResult.Summary.WouldRebase = 0
 	scanResult.Summary.WouldClose = 0
+	scanResult.Summary.ReadyToMerge = 0
+	scanResult.Summary.AlreadyUpToDate = 0
 	scanResult.Summary.Skipped = 0
 	scanResult.Summary.SkippedByReason = make(map[string]int)
 
@@ -227,11 +229,12 @@ func (m *Merger) RunWithActions(ctx context.Context, scanResult *output.RunResul
 		m.console.FinishProgress()
 	}
 
-	// Print action results only when they were not already streamed during execution.
-	// When showProgress is true, results were streamed inline with the progress bar.
-	if m.console != nil && !m.config.JSON && !showProgress {
+	// Completed repositories stream during execution. Also display non-action
+	// results omitted from the non-verbose pending-actions view.
+	if m.console != nil && !m.config.JSON {
 		for _, repo := range scanResult.Repositories {
-			if hasCompletedActions(repo) {
+			completed := hasCompletedActions(repo)
+			if (completed && !showProgress) || (!completed && !m.config.Verbose && len(repo.PullRequests) > 0) {
 				m.console.PrintRepoResult(repo)
 			}
 		}
@@ -352,7 +355,10 @@ func (m *Merger) processRepositoryScanOnly(ctx context.Context, repo gh.Reposito
 
 	// Process each pull request sequentially (scan only)
 	for _, pr := range prs {
-		prResult := m.evaluatePullRequest(ctx, owner, repo, pr)
+		prResult := m.patternExclusion(pr, prs)
+		if prResult.Action == "" {
+			prResult = m.evaluatePullRequest(ctx, owner, repo, pr)
+		}
 		repoResult.PullRequests = append(repoResult.PullRequests, prResult)
 	}
 
@@ -391,7 +397,7 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 	// When in rebase-only mode, we don't require passing checks since rebasing
 	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
-	checksState := "all checks passing"
+	checksState := describeChecks(checkStatus)
 
 	if checkStatus.NoChecks {
 		checksState = "no checks configured"
@@ -456,7 +462,13 @@ func (m *Merger) evaluatePullRequest(ctx context.Context, owner string, repo gh.
 		return result
 	}
 
-	// All conditions met, ready to merge
+	// Rebase reports branch freshness independently of check eligibility.
+	if rebaseOnly {
+		result.Action = output.ActionNoRebaseNeeded
+		result.Reason = checksState + ", branch up to date"
+		return result
+	}
+
 	if m.config.Merge {
 		result.Action = output.ActionWouldMerge
 		result.Reason = checksState + ", branch up to date"
@@ -534,6 +546,8 @@ func (m *Merger) updateSummary(summary *output.RunSummary, pr output.PullRequest
 		summary.WouldRebase++
 	case output.ActionWouldClose:
 		summary.WouldClose++
+	case output.ActionNoRebaseNeeded:
+		summary.AlreadyUpToDate++
 	case output.ActionReadyMerge:
 		summary.ReadyToMerge++
 	default:
@@ -591,7 +605,10 @@ func (m *Merger) processRepository(ctx context.Context, repo gh.Repository) outp
 
 	// Process each pull request sequentially
 	for _, pr := range prs {
-		prResult := m.processPullRequest(ctx, owner, repo, pr)
+		prResult := m.patternExclusion(pr, prs)
+		if prResult.Action == "" {
+			prResult = m.processPullRequest(ctx, owner, repo, pr)
+		}
 		repoResult.PullRequests = append(repoResult.PullRequests, prResult)
 	}
 
@@ -599,10 +616,7 @@ func (m *Merger) processRepository(ctx context.Context, repo gh.Repository) outp
 }
 
 // discoverPullRequests discovers all candidate pull requests for a repository.
-// When multiple source branches are configured, PRs matching any of the patterns
-// are included. If multiple source branches match the same repo, only the first
-// matching source branch (by order specified) is used; subsequent matches are
-// logged as skipped with a "concurrent" reason.
+// All eligible matches are returned so exclusions can be reported explicitly.
 func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) ([]gh.PullRequest, error) {
 	owner := strings.Split(repo.FullName, "/")[0]
 
@@ -613,9 +627,6 @@ func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) (
 
 	// Filter pull requests
 	var prs []gh.PullRequest
-	// Track which source branch pattern was the first to match this repo
-	firstMatchedPattern := ""
-
 	for _, pr := range allPRs {
 		// Skip drafts
 		if pr.Draft {
@@ -636,15 +647,6 @@ func (m *Merger) discoverPullRequests(ctx context.Context, repo gh.Repository) (
 			}
 		}
 		if matchedPattern == "" {
-			continue
-		}
-
-		// Concurrent check: if this repo already matched a different source branch
-		// pattern, skip PRs from subsequent patterns
-		if firstMatchedPattern == "" {
-			firstMatchedPattern = matchedPattern
-		} else if matchedPattern != firstMatchedPattern {
-			// Different source branch pattern for the same repo - skip as concurrent
 			continue
 		}
 
@@ -686,7 +688,7 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 	// When in rebase-only mode, we don't require passing checks since rebasing
 	// may resolve issues by incorporating upstream changes
 	rebaseOnly := m.config.Rebase && !m.config.Merge
-	checksState := "all checks passing"
+	checksState := describeChecks(checkStatus)
 
 	if checkStatus.NoChecks {
 		checksState = "no checks configured"
@@ -728,7 +730,12 @@ func (m *Merger) processPullRequest(ctx context.Context, owner string, repo gh.R
 		return m.handleOutdatedBranch(ctx, owner, repo, pr, branchStatus, checksState)
 	}
 
-	// All conditions met, ready to merge
+	if rebaseOnly {
+		result.Action = output.ActionNoRebaseNeeded
+		result.Reason = checksState + ", branch up to date"
+		return result
+	}
+
 	return m.handleMergeReady(ctx, owner, repo, pr, checksState)
 }
 
@@ -815,4 +822,45 @@ func (m *Merger) handleMergeReady(ctx context.Context, owner string, repo gh.Rep
 	result.Action = output.ActionMerged
 	result.Reason = "successfully merged (" + checksState + ")"
 	return result
+}
+
+// describeChecks preserves observed check state even when checks do not gate an action.
+func describeChecks(status *gh.CheckStatus) string {
+	if status.NoChecks {
+		return "no checks configured"
+	}
+	if status.Pending {
+		return "checks pending"
+	}
+	if !status.AllPassing {
+		return "checks failing"
+	}
+	return "all checks passing"
+}
+
+// Rebase can update all matching branches without changing the base branch.
+// Other commands retain one pattern per repository, selected in flag order.
+func (m *Merger) patternExclusion(pr gh.PullRequest, prs []gh.PullRequest) output.PullRequestResult {
+	if m.config.Rebase {
+		return output.PullRequestResult{}
+	}
+	for _, pattern := range m.config.SourceBranches {
+		found := false
+		for _, candidate := range prs {
+			if gh.MatchesBranchPattern(candidate.HeadBranch, pattern) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		if gh.MatchesBranchPattern(pr.HeadBranch, pattern) {
+			return output.PullRequestResult{}
+		}
+		return output.PullRequestResult{Number: pr.Number, URL: pr.URL, HeadBranch: pr.HeadBranch, Title: pr.Title,
+			Action: output.ActionSkipOtherPattern, SkipReason: output.ReasonOtherPattern,
+			Reason: fmt.Sprintf("source pattern %q selected for this repository; run this branch separately", pattern)}
+	}
+	return output.PullRequestResult{}
 }
