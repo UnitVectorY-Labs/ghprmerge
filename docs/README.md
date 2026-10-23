@@ -29,7 +29,7 @@ ghprmerge is designed to be **safe by default**:
 1. **Explicit subcommands** - Use `merge` to merge PRs, `rebase` to update branches, `close` to close unwanted PRs, or `report` for a read-only overview
 2. **Confirmation mode** - Use `--confirm` with `merge`, `rebase`, or `close` to preview what would happen before executing
 3. **Strict readiness checks** - A PR is only considered ready if:
-   - All check runs have a successful conclusion (including non-required checks), or no checks are configured at all
+   - All check runs have a `success`, `skipped`, or `neutral` conclusion (including non-required checks), or no checks are configured at all
    - All commit status contexts are successful, or no statuses are configured at all
    - No merge conflicts
    - Branch is fully up to date with the default branch (unless `--skip-rebase` is used with `merge`)

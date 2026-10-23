@@ -252,8 +252,8 @@ func (c *RealClient) GetCheckStatus(ctx context.Context, owner, repo, ref string
 			}, nil
 		}
 
-		// Only "success" is considered passing
-		if conclusion != "success" {
+		// GitHub considers success, skipped, and neutral conclusions passing.
+		if conclusion != "success" && conclusion != "skipped" && conclusion != "neutral" {
 			return &CheckStatus{
 				AllPassing: false,
 				Details:    fmt.Sprintf("check '%s' has conclusion '%s'", check.GetName(), conclusion),
