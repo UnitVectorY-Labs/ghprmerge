@@ -178,7 +178,7 @@ When a PR is skipped, one of these reasons is shown:
 | `insufficient permissions` | Token lacks required permissions |
 | `API error` | GitHub API error (includes details) |
 
-Pull requests with no checks configured are allowed to proceed. Pending checks still block merge decisions.
+Completed check runs with `success`, `skipped`, or `neutral` conclusions count as passing in reports and merge decisions. Legacy commit status contexts must be `success`. Pull requests with no checks configured are allowed to proceed. Pending checks still block merge decisions.
 
 ## Output Format
 

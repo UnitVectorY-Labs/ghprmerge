@@ -33,7 +33,8 @@ ghprmerge close --org myorg --source-branch stale/
 # Delete source branches after successfully closing their PRs
 ghprmerge close --org myorg --source-branch stale/ --delete-source-branch
 
-# PRs with no checks configured are allowed; pending checks still block merging
+# Completed success, skipped, and neutral checks pass; pending checks block merging
+# PRs with no checks configured are allowed
 
 # Merge PRs even if behind (skip rebase requirement)
 ghprmerge merge --org myorg --source-branch dependabot/ --skip-rebase

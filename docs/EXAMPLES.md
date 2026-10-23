@@ -84,7 +84,7 @@ ghprmerge merge --org myorg --source-branch dependabot/
 
 PRs that are behind the default branch will be skipped (use `rebase` first to update them, or `--skip-rebase` to merge anyway).
 
-PRs with no checks configured are allowed to merge. PRs with pending checks are still skipped.
+Completed check runs with `success`, `skipped`, or `neutral` conclusions count as passing. For example, an intentionally skipped OSV full scan alongside a successful PR scan does not block this merge command. Legacy commit status contexts must be `success`. PRs with no checks configured are allowed to merge. PRs with pending checks are still skipped.
 
 ## Merge with Skip Rebase
 
