@@ -2,7 +2,7 @@ package output
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 )
@@ -199,5 +199,16 @@ func TestFormatReportEmptyJSON(t *testing.T) {
 	}
 	if parsed.Groups == nil || len(parsed.Groups) != 0 {
 		t.Errorf("expected empty groups array")
+	}
+}
+
+func TestReportJSONNilSlices(t *testing.T) {
+	var buf bytes.Buffer
+	result := &ReportResult{Groups: []ReportGroup{{}}}
+	if err := NewWriter(&buf, true, false).WriteReportResult(result, "standard"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "\"pullRequests\": []") || !strings.HasSuffix(buf.String(), "}\n") {
+		t.Errorf("unexpected report output: %s", buf.String())
 	}
 }

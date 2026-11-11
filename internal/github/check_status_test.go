@@ -2,7 +2,7 @@ package github
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -52,14 +52,14 @@ func TestGetCheckStatusConclusions(t *testing.T) {
 					}
 					runs = append(runs, map[string]string{"name": "check", "status": status, "conclusion": conclusion})
 				}
-				json.NewEncoder(w).Encode(map[string]any{"total_count": len(runs), "check_runs": runs})
+				json.MarshalWrite(w, map[string]any{"total_count": len(runs), "check_runs": runs})
 			})
 			mux.HandleFunc("/repos/owner/repo/commits/sha/status", func(w http.ResponseWriter, r *http.Request) {
 				statuses := []map[string]string{}
 				if tt.commitState != "" {
 					statuses = append(statuses, map[string]string{"context": "legacy", "state": tt.commitState})
 				}
-				json.NewEncoder(w).Encode(map[string]any{"statuses": statuses})
+				json.MarshalWrite(w, map[string]any{"statuses": statuses})
 			})
 			server := httptest.NewServer(mux)
 			defer server.Close()

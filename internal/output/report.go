@@ -2,7 +2,8 @@
 package output
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"strings"
@@ -42,9 +43,7 @@ func (w *Writer) WriteReportResult(result *ReportResult, verbosity string) error
 
 // writeReportJSON writes the report as JSON.
 func (w *Writer) writeReportJSON(result *ReportResult) error {
-	encoder := json.NewEncoder(w.out)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
+	return json.MarshalEncode(jsontext.NewEncoder(w.out, jsontext.WithIndent("  ")), result)
 }
 
 // writeReportHuman writes the report in human-readable format.
@@ -148,7 +147,5 @@ func (c *Console) PrintReportSummary(totalGroups, totalPRs int) {
 
 // FormatReportEmptyJSON returns an empty report JSON result with an empty groups array.
 func FormatReportEmptyJSON(w io.Writer) error {
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(&ReportResult{Groups: []ReportGroup{}})
+	return json.MarshalEncode(jsontext.NewEncoder(w, jsontext.WithIndent("  ")), &ReportResult{Groups: []ReportGroup{}})
 }
