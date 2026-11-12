@@ -2,7 +2,7 @@ package output
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 	"time"
@@ -243,5 +243,32 @@ func TestWriterSummaryHidesZeroCounts(t *testing.T) {
 	}
 	if strings.Contains(output, "rebased") {
 		t.Errorf("Expected no rebase count when zero:\n%s", output)
+	}
+}
+
+func TestJSONOutputV2Behavior(t *testing.T) {
+	var buf bytes.Buffer
+	result := &RunResult{Repositories: []RepositoryResult{{}}}
+	if err := NewWriter(&buf, true, true).WriteResult(result); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{"\n  \"metadata\":", "\"pull_requests\": []", "}\n"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %q: %s", want, output)
+		}
+	}
+	for _, omitted := range []string{"\"skipped\": false", "\"repo_limit\"", "\"would_merge\""} {
+		if strings.Contains(output, omitted) {
+			t.Errorf("output unexpectedly contains %q: %s", omitted, output)
+		}
+	}
+}
+
+func TestJSONOutputRejectsInvalidUTF8(t *testing.T) {
+	var buf bytes.Buffer
+	result := &RunResult{Metadata: RunMetadata{Org: string([]byte{0xff})}}
+	if err := NewWriter(&buf, true, true).WriteResult(result); err == nil {
+		t.Fatal("expected invalid UTF-8 to be rejected")
 	}
 }

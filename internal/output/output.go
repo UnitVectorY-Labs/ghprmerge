@@ -2,7 +2,8 @@
 package output
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"io"
 	"time"
 )
@@ -80,7 +81,7 @@ type RepositoryResult struct {
 	FullName      string              `json:"full_name"`
 	DefaultBranch string              `json:"default_branch"`
 	PullRequests  []PullRequestResult `json:"pull_requests"`
-	Skipped       bool                `json:"skipped,omitempty"`
+	Skipped       bool                `json:"skipped,omitzero"`
 	SkipReason    string              `json:"skip_reason,omitempty"`
 }
 
@@ -100,7 +101,7 @@ type RunMetadata struct {
 	Rebase        bool      `json:"rebase"`
 	Merge         bool      `json:"merge"`
 	Close         bool      `json:"close"`
-	RepoLimit     int       `json:"repo_limit,omitempty"`
+	RepoLimit     int       `json:"repo_limit,omitzero"`
 	RepoLimitDesc string    `json:"repo_limit_desc,omitempty"`
 	StartTime     time.Time `json:"start_time"`
 	EndTime       time.Time `json:"end_time"`
@@ -117,11 +118,11 @@ type RunSummary struct {
 	RebaseFailed    int            `json:"rebase_failed"`
 	ClosedSuccess   int            `json:"closed_success"`
 	CloseFailed     int            `json:"close_failed"`
-	WouldMerge      int            `json:"would_merge,omitempty"`
-	WouldRebase     int            `json:"would_rebase,omitempty"`
-	WouldClose      int            `json:"would_close,omitempty"`
-	AlreadyUpToDate int            `json:"already_up_to_date,omitempty"`
-	ReadyToMerge    int            `json:"ready_to_merge,omitempty"`
+	WouldMerge      int            `json:"would_merge,omitzero"`
+	WouldRebase     int            `json:"would_rebase,omitzero"`
+	WouldClose      int            `json:"would_close,omitzero"`
+	AlreadyUpToDate int            `json:"already_up_to_date,omitzero"`
+	ReadyToMerge    int            `json:"ready_to_merge,omitzero"`
 	Skipped         int            `json:"skipped"`
 	SkippedByReason map[string]int `json:"skipped_by_reason,omitempty"`
 }
@@ -152,9 +153,7 @@ func (w *Writer) WriteResult(result *RunResult) error {
 
 // writeJSON writes the result as JSON.
 func (w *Writer) writeJSON(result *RunResult) error {
-	encoder := json.NewEncoder(w.out)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
+	return json.MarshalEncode(jsontext.NewEncoder(w.out, jsontext.WithIndent("  ")), result)
 }
 
 // writeHuman writes the result in human-readable format as a condensed summary.
